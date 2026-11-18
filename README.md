@@ -16,3 +16,10 @@ Allt som registreras sparas bara på den egna enheten. Använd **Exportera** på
 
 ## Uppdatera appen
 När `index.html` ändras: höj versionen i `sw.js` (`guif-stat-v1` → `guif-stat-v2`) så att telefonerna hämtar den nya versionen.
+
+## Molnsynk
+Med inloggning (Firebase) synkas lag, matcher och statistik mellan alla tränare i samma lagutrymme, även live under match. Appen fungerar utan internet och synkar när nätet är tillbaka.
+
+- Första enheten: **Logga in** → **Skapa nytt lagutrymme** (laddar upp enhetens data) → dela lagkoden.
+- Övriga: **Logga in** → **Gå med** med lagkoden.
+- Säkerhetsreglerna finns i `firestore.rules` och klistras in under Firestore → Regler i Firebase-konsolen.

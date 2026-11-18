@@ -167,6 +167,12 @@ table.click tr[data-pid]:active,table.click tr[data-mid]:active{background:#2a2a
 table.tbl td,table.tbl th{padding:6px 4px;font-size:14px}
 table.tbl td:nth-child(2),table.tbl th:nth-child(2){text-align:left}
 table.tbl tr.me td{color:#ff4d55;font-weight:700}
+.cdot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.cdot.ok{background:#27ae60}.cdot.off{background:#f2c94c}.cdot.err{background:#eb5757}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.pill.ok{background:#1e4d32;color:#6fe39b}.pill.off{background:#4d3f12;color:#ffd96a}
+.err{color:#ff6b6b;font-size:14px;min-height:0;margin:8px 0 0}
+.code{letter-spacing:2px;font-size:17px;color:var(--txt)}
 small.mut{color:var(--mut);font-size:12px}
 @media (max-width:700px){.hgrid{grid-template-columns:1fr}.bigbtn{padding:18px}.page{padding:10px;gap:10px}.kpis b{font-size:22px}}
 </style>
@@ -211,7 +217,7 @@ small.mut{color:var(--mut);font-size:12px}
 <!-- ===== MATCH ===== -->
 <section id="v-match" class="view">
   <header>
-    <span class="badge">GUIF</span>
+    <span class="badge">GUIF</span><span id="cdot" class="cdot" style="display:none"></span>
     <span class="tname cus" id="h-us"></span><span class="score" id="h-score">0–0</span><span class="tname cthem" id="h-them"></span>
     <span class="spacer"></span>
     <button class="hbtn" id="b-half"></button>
@@ -355,7 +361,8 @@ if((DB.seed||0)<SEED_V3){
   }
   DB.seed=SEED_V3;
 }
-function save(){try{localStorage.setItem(K,JSON.stringify(DB))}catch(e){}}
+function saveLocal(){try{localStorage.setItem(K,JSON.stringify(DB))}catch(e){}}
+function save(){saveLocal();scheduleSync()}
 const team=id=>DB.teams.find(t=>t.id===id);
 const ownTeams=()=>DB.teams.filter(t=>t.type==='own');
 const oppTeams=()=>DB.teams.filter(t=>t.type==='opp');
@@ -377,7 +384,7 @@ function oppLabel(u){return u?('#'+u+(oppName(u)?' '+oppName(u):'')):'okänt nr'
 
 /* ---------- overlay ---------- */
 function open(html){$('sheet').innerHTML=html;$('ov').classList.add('on')}
-function close(){$('ov').classList.remove('on');$('sheet').innerHTML=''}
+function close(){$('ov').classList.remove('on');$('sheet').innerHTML='';if(pendingRender){pendingRender=false;setTimeout(rerenderView,0)}}
 $('ov').addEventListener('click',e=>{if(e.target.id==='ov')close()});
 function ask(msg,okText,cb){
   open(`<h3>${esc(msg)}</h3><div class="row"><button class="hbtn" id="a-no">Avbryt</button><button class="hbtn stop" id="a-yes">${esc(okText)}</button></div>`);
@@ -386,7 +393,9 @@ function ask(msg,okText,cb){
 
 /* ---------- navigation ---------- */
 const R={home:renderHome,team:renderTeam,new:renderNew,match:renderMatch,stats:renderStats,players:renderPlayers,player:renderPlayer};
+let curView='home';
 function show(v){
+  curView=v;
   document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
   R[v]();window.scrollTo(0,0);
 }
@@ -419,11 +428,13 @@ function renderHome(){
     ${oppTeams().map(t=>item(`data-t="${t.id}"`,esc(t.name),t.players.length?t.players.length+' spelare':'ingen trupp')).join('')||'<p class="empty">Sparas automatiskt när du startar en match.</p>'}
     <div class="row"><button class="hbtn" id="h-addteam">＋ Nytt lag</button></div>
   </div>
+  ${cloudCard()}
   <div class="card"><h3>Säkerhetskopia och dela data</h3>
     <p class="note" style="margin-top:0">Allt sparas bara på den här enheten. Exportera efter varje match så har du en backup. Filen kan också skickas till en annan tränare, som importerar den i sin app.</p>
     <div class="row" style="justify-content:flex-start"><button class="hbtn" id="h-exp">📤 Exportera allt</button><button class="hbtn" id="h-imp">📥 Importera fil</button></div>
     <input type="file" id="h-file" accept=".json,application/json" style="display:none">
   </div>`;
+  bindCloudCard();
   $('h-exp').onclick=()=>exportData(DB,'guif-statistik-'+today());
   $('h-imp').onclick=()=>$('h-file').click();
   $('h-file').onchange=e=>{const f=e.target.files[0];if(f)importFile(f);e.target.value=''};
@@ -500,7 +511,7 @@ $('n-start').onclick=()=>{
   }
   const g=t.players.find(p=>p.gk);
   S={id:uid(),date:$('n-date').value||today(),teamId:t.id,team:t.name,opp,oppPlayers,players:t.players.map(p=>({...p})),events:[],half:1,clock:{run:false,at:0,el:0},gk:g?g.id:null,done:false,created:Date.now()};
-  if(pendingFx){S.fixtureId=pendingFx.id;S.venue=pendingFx.venue;pendingFx=null}
+  if(pendingFx){Object.assign(S,{fixtureId:pendingFx.id,venue:pendingFx.venue,home:pendingFx.home,round:pendingFx.round,time:pendingFx.time});pendingFx=null}
   DB.matches.push(S);save();show('match');
 };
 
@@ -540,7 +551,7 @@ $('b-gk').onclick=()=>pickPlayer('Vem står i mål?',true,p=>{S.gk=p;save();clos
 function add(e){S.events.push(e);save();close();renderMatch()}
 document.querySelectorAll('.ev').forEach(b=>b.onclick=()=>register(b.dataset.side,b.dataset.type));
 function register(side,type){
-  const base={id:uid(),side,type,t:secs(),half:S.half};
+  const base={id:uid(),side,type,t:secs(),half:S.half,at:Date.now()};
   if(side==='us'){
     const title={goal:'Mål – vem gjorde det?',miss:'Skott utanför – vem sköt?',saved:'Deras målvakt räddade – vem sköt?',tf:'Tekniskt fel – vem?'}[type];
     pickPlayer(title,false,p=>{
@@ -819,6 +830,224 @@ function importFile(f){
 
 /* offline-stöd när appen körs från en riktig webbadress */
 if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+
+/* =========================================================
+   MOLNSYNK (Firebase)
+   ========================================================= */
+const FB_CONFIG={apiKey:"AIzaSyA2vs1BGioRe8H-UpSaoV_3ODBHNhmULec",authDomain:"guif-stat.firebaseapp.com",projectId:"guif-stat",storageBucket:"guif-stat.firebasestorage.app",messagingSenderId:"149923454385",appId:"1:149923454385:web:73bd9b0cda277a1afdb190"};
+const FB_URL='https://www.gstatic.com/firebasejs/10.12.2/';
+const CK='guifstat-cloud';
+let CLOUD={space:null,used:false,last:{},ready:false};
+try{const c=JSON.parse(localStorage.getItem(CK));if(c)Object.assign(CLOUD,{space:c.space||null,used:!!c.used,last:c.last||{}})}catch(e){}
+function saveCloudState(){try{localStorage.setItem(CK,JSON.stringify({space:CLOUD.space,used:CLOUD.used,last:CLOUD.last}))}catch(e){}}
+let F=null,fbState='idle',authKnown=false,user=null,unsubs=[],cloudErr='',fbLoading=null,syncTimer=null,pendingRender=false,orphans={};
+
+function stable(v){
+  if(Array.isArray(v))return '['+v.map(stable).join(',')+']';
+  if(v&&typeof v==='object')return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
+  return JSON.stringify(v===undefined?null:v);
+}
+const clean=o=>JSON.parse(JSON.stringify(o));
+function matchMeta(m){const r={...m};delete r.events;return clean(r)}
+function eventDoc(e,m){return clean({...e,matchId:m.id})}
+function metaDoc(){return clean({fixtures:DB.fixtures||[],table:DB.table?JSON.stringify(DB.table):'',seed:DB.seed||0})}
+function errText(e){
+  const c=(e&&e.code)||'';
+  return({'auth/invalid-credential':'Fel e-post eller lösenord.','auth/wrong-password':'Fel e-post eller lösenord.','auth/user-not-found':'Det finns inget konto med den e-postadressen.',
+    'auth/email-already-in-use':'Det finns redan ett konto med den e-postadressen. Logga in i stället.','auth/weak-password':'Lösenordet måste vara minst 6 tecken.',
+    'auth/invalid-email':'E-postadressen ser inte rätt ut.','auth/network-request-failed':'Ingen internetanslutning.','auth/too-many-requests':'För många försök. Vänta en stund och försök igen.',
+    'permission-denied':'Saknar behörighet. Har säkerhetsreglerna publicerats i Firebase?','unavailable':'Ingen kontakt med molnet just nu.'})[c]||('Något gick fel'+(c?' ('+c+')':'')+'.');
+}
+
+function loadFirebase(){
+  if(fbLoading)return fbLoading;
+  fbState='loading';
+  const mods=window.__FB_MOCK?Promise.resolve(window.__FB_MOCK):Promise.all([import(FB_URL+'firebase-app.js'),import(FB_URL+'firebase-auth.js'),import(FB_URL+'firebase-firestore.js')]);
+  fbLoading=mods.then(([A,U,Fs])=>{
+    const app=A.initializeApp(FB_CONFIG);
+    let db;try{db=Fs.initializeFirestore(app,{localCache:Fs.persistentLocalCache()})}catch(e){db=Fs.getFirestore(app)}
+    F={auth:U.getAuth(app),db,U,Fs};fbState='ready';
+    U.onAuthStateChanged(F.auth,u=>{
+      authKnown=true;user=u;
+      if(u&&CLOUD.space)startSync();else stopSync();
+      refreshCloudUI();
+    });
+    return F;
+  }).catch(e=>{fbLoading=null;fbState='error';cloudErr='Kunde inte ladda molntjänsten. Kontrollera internetanslutningen.';refreshCloudUI();throw e});
+  return fbLoading;
+}
+
+/* ---- skriv lokala ändringar till molnet ---- */
+function scheduleSync(){if(!CLOUD.space||!user||!F)return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,150)}
+function syncNow(){
+  if(!CLOUD.space||!user||!F||!CLOUD.ready)return;
+  const Fs=F.Fs,want={};
+  DB.teams.forEach(t=>want['teams/'+t.id]=clean(t));
+  DB.matches.forEach(m=>{want['matches/'+m.id]=matchMeta(m);m.events.forEach(e=>want['events/'+e.id]=eventDoc(e,m))});
+  want['meta/main']=metaDoc();
+  const last=CLOUD.last,fail=e=>{cloudErr=errText(e);refreshCloudUI()};
+  Object.keys(want).forEach(k=>{
+    const s=stable(want[k]);if(last[k]===s)return;
+    last[k]=s;const i=k.indexOf('/');
+    Fs.setDoc(Fs.doc(F.db,'spaces',CLOUD.space,k.slice(0,i),k.slice(i+1)),want[k]).catch(fail);
+  });
+  Object.keys(last).forEach(k=>{
+    if(k in want)return;
+    delete last[k];const i=k.indexOf('/');
+    Fs.deleteDoc(Fs.doc(F.db,'spaces',CLOUD.space,k.slice(0,i),k.slice(i+1))).catch(fail);
+  });
+  saveCloudState();
+}
+
+/* ---- ta emot ändringar från molnet ---- */
+function replaceIn(target,data){Object.keys(target).forEach(k=>{if(!(k in data))delete target[k]});Object.assign(target,data)}
+const APPLY={
+  teams(op,id,d){
+    if(op==='remove'){DB.teams=DB.teams.filter(t=>t.id!==id);delete CLOUD.last['teams/'+id];return}
+    const t=DB.teams.find(x=>x.id===id);const data={...d,id};
+    if(t)replaceIn(t,data);else DB.teams.push(data);
+    CLOUD.last['teams/'+id]=stable(d);
+  },
+  matches(op,id,d){
+    if(op==='remove'){DB.matches=DB.matches.filter(m=>m.id!==id);if(S&&S.id===id)S=null;delete CLOUD.last['matches/'+id];return}
+    const m=DB.matches.find(x=>x.id===id);
+    if(m){const ev=m.events;replaceIn(m,{...d,id});m.events=ev}
+    else{DB.matches.push({...d,id,events:(orphans[id]||[]).sort((a,b)=>(a.at||0)-(b.at||0))});delete orphans[id]}
+    CLOUD.last['matches/'+id]=stable(d);
+  },
+  events(op,id,d){
+    if(op==='remove'){DB.matches.forEach(m=>{const i=m.events.findIndex(e=>e.id===id);if(i>=0)m.events.splice(i,1)});Object.keys(orphans).forEach(k=>orphans[k]=orphans[k].filter(e=>e.id!==id));delete CLOUD.last['events/'+id];return}
+    const e={...d,id};delete e.matchId;
+    const m=DB.matches.find(x=>x.id===d.matchId);
+    if(!m){const o=orphans[d.matchId]=orphans[d.matchId]||[];const i=o.findIndex(x=>x.id===id);if(i>=0)o[i]=e;else o.push(e)}
+    else{const i=m.events.findIndex(x=>x.id===id);if(i>=0)m.events[i]=e;else{m.events.push(e);m.events.sort((a,b)=>(a.at||0)-(b.at||0))}}
+    CLOUD.last['events/'+id]=stable(d);
+  },
+  meta(op,id,d){
+    if(op==='remove'||id!=='main')return;
+    DB.fixtures=d.fixtures||[];try{DB.table=d.table?JSON.parse(d.table):null}catch(e){DB.table=null}
+    if(d.seed)DB.seed=d.seed;
+    CLOUD.last['meta/main']=stable(d);
+  }
+};
+function startSync(){
+  stopSync();if(!F||!user||!CLOUD.space)return;
+  CLOUD.ready=false;cloudErr='';
+  const Fs=F.Fs,got=new Set(),rec=new Set(),names=['teams','matches','events','meta'];
+  names.forEach(name=>{
+    unsubs.push(Fs.onSnapshot(Fs.collection(F.db,'spaces',CLOUD.space,name),{includeMetadataChanges:true},snap=>{
+      if(!got.has(name))snap.docs.forEach(d=>APPLY[name]('upsert',d.id,d.data()));
+      else snap.docChanges().forEach(ch=>APPLY[name](ch.type==='removed'?'remove':'upsert',ch.doc.id,ch.doc.data()));
+      if(!rec.has(name)&&!snap.metadata.fromCache){
+        /* det som togs bort i molnet medan enheten var borta */
+        rec.add(name);const ids=new Set(snap.docs.map(d=>d.id));
+        Object.keys(CLOUD.last).filter(k=>k.startsWith(name+'/')).forEach(k=>{const id=k.slice(name.length+1);if(!ids.has(id))APPLY[name]('remove',id)});
+      }
+      if(!got.has(name)){got.add(name);if(got.size===names.length){CLOUD.ready=true;syncNow()}}
+      saveLocal();saveCloudState();remoteChanged();
+    },e=>{cloudErr=errText(e);refreshCloudUI()}));
+  });
+}
+function stopSync(){unsubs.forEach(u=>{try{u()}catch(e){}});unsubs=[];CLOUD.ready=false}
+function remoteChanged(){if($('ov').classList.contains('on')){pendingRender=true;return}rerenderView()}
+function rerenderView(){
+  updateDot();
+  if(curView==='team'||curView==='new')return;
+  if((curView==='match'||curView==='stats')&&!S){show('home');return}
+  if(curView==='match'&&S.done){resetMap();show('stats');return}
+  R[curView]();
+}
+function refreshCloudUI(){updateDot();if(curView==='home'&&!$('ov').classList.contains('on'))renderHome()}
+function updateDot(){
+  const d=$('cdot');if(!d)return;
+  const on=!!(CLOUD.space&&user);
+  d.style.display=on?'':'none';
+  d.className='cdot '+(cloudErr?'err':navigator.onLine?'ok':'off');
+  d.title=cloudErr||(navigator.onLine?'Synkat med molnet':'Offline – synkar när nätet är tillbaka');
+}
+window.addEventListener('online',()=>{updateDot();if(curView==='home')refreshCloudUI()});
+window.addEventListener('offline',()=>{updateDot();if(curView==='home')refreshCloudUI()});
+
+/* ---- kortet på startskärmen ---- */
+function cloudCard(){
+  const st=!navigator.onLine?'<span class="pill off">Offline – synkar när nätet är tillbaka</span>':'<span class="pill ok">Online</span>';
+  let body;
+  if(CLOUD.space&&(fbState==='loading'||(fbState==='ready'&&!authKnown)))body=`<p class="note">Ansluter till molnet…</p>`;
+  else if(!user)body=`<p class="note" style="margin-top:0">Logga in för att synka matcher och statistik mellan iPad, telefon och andra tränare. Allt fungerar även utan internet och synkas när nätet kommer tillbaka.</p>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn go" id="c-login">Logga in eller skapa konto</button></div>`;
+  else if(!CLOUD.space)body=`<p class="note" style="margin-top:0">Inloggad som <b>${esc(user.email)}</b>. Välj lagutrymme för att börja synka.</p>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn go" id="c-space">Välj lagutrymme</button><button class="hbtn" id="c-out">Logga ut</button></div>`;
+  else body=`<p style="margin:0 0 8px">${st}</p><p class="note" style="margin-top:0">Inloggad som <b>${esc(user.email)}</b>.<br>Lagkod: <b class="code">${esc(CLOUD.space)}</b>. Ge den till tränare som ska synka med dig.</p>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="c-share">Dela lagkoden</button><button class="hbtn" id="c-out">Logga ut</button></div>`;
+  return `<div class="card"><h3>☁️ Molnsynk</h3>${body}${cloudErr?`<p class="err">${esc(cloudErr)}</p>`:''}</div>`;
+}
+function bindCloudCard(){
+  if($('c-login'))$('c-login').onclick=cloudLogin;
+  if($('c-space'))$('c-space').onclick=chooseSpace;
+  if($('c-out'))$('c-out').onclick=()=>ask('Logga ut? Det som finns på enheten ligger kvar men slutar synkas.','Logga ut',async()=>{stopSync();CLOUD.space=null;CLOUD.last={};saveCloudState();try{await F.U.signOut(F.auth)}catch(e){}user=null;renderHome()});
+  if($('c-share'))$('c-share').onclick=async()=>{
+    const t=`Gå med i Guif Matchstatistik: öppna https://dickfors.github.io/guif-stat/ , logga in och ange lagkoden ${CLOUD.space}`;
+    try{if(navigator.share){await navigator.share({text:t});return}}catch(e){if(e&&e.name==='AbortError')return}
+    try{await navigator.clipboard.writeText(t);$('c-share').textContent='✓ Kopierat'}catch(e){open(`<h3>Lagkod</h3><p style="font-size:28px;font-weight:800;letter-spacing:2px">${esc(CLOUD.space)}</p><div class="row"><button class="hbtn" id="x-c">Stäng</button></div>`);$('x-c').onclick=close}
+  };
+}
+function cloudLogin(){
+  CLOUD.used=true;saveCloudState();loadFirebase().catch(()=>{});
+  open(`<h3>Logga in</h3>
+  <label for="l-mail">E-post</label><input id="l-mail" type="email" autocomplete="username" autocapitalize="off">
+  <label for="l-pass">Lösenord (minst 6 tecken)</label><input id="l-pass" type="password" autocomplete="current-password">
+  <p class="err" id="l-msg"></p>
+  <div class="row"><button class="hbtn" id="l-x">Avbryt</button><button class="hbtn" id="l-new">Skapa konto</button><button class="hbtn go" id="l-in">Logga in</button></div>
+  <p class="note"><a href="#" id="l-forgot" style="color:var(--them)">Glömt lösenordet?</a></p>`);
+  const msg=t=>{$('l-msg').textContent=t};
+  const go=async create=>{
+    const m=$('l-mail').value.trim(),p=$('l-pass').value;if(!m||!p){msg('Fyll i e-post och lösenord.');return}
+    msg('Vänta…');
+    try{await loadFirebase();
+      if(create)await F.U.createUserWithEmailAndPassword(F.auth,m,p);else await F.U.signInWithEmailAndPassword(F.auth,m,p);
+      close();if(!CLOUD.space)chooseSpace();
+    }catch(e){msg(errText(e))}
+  };
+  $('l-in').onclick=()=>go(false);$('l-new').onclick=()=>go(true);$('l-x').onclick=close;
+  $('l-forgot').onclick=async e=>{e.preventDefault();const m=$('l-mail').value.trim();if(!m){msg('Skriv din e-post först.');return}
+    try{await loadFirebase();await F.U.sendPasswordResetEmail(F.auth,m);msg('Ett mejl för att byta lösenord har skickats.')}catch(err){msg(errText(err))}};
+}
+function chooseSpace(){
+  open(`<h3>Lagutrymme</h3>
+  <p class="note" style="margin-top:0">Alla tränare som ska synka med varandra använder samma lagutrymme.</p>
+  <div class="card" style="background:#26262c"><b>Gå med i ett befintligt lag</b>
+    <label for="j-code">Lagkod</label><input id="j-code" autocapitalize="characters" autocomplete="off" placeholder="T.ex. K7QM2XPA">
+    <div class="row"><button class="hbtn go" id="j-go">Gå med</button></div></div>
+  <div class="card" style="background:#26262c;margin-top:10px"><b>Starta ett nytt lagutrymme</b>
+    <p class="note">Det som finns på den här enheten laddas upp: lag, trupp, matcher och statistik. Gör så här på den enhet där du har registrerat mest.</p>
+    <div class="row"><button class="hbtn" id="j-new">Skapa nytt lagutrymme</button></div></div>
+  <p class="err" id="j-msg"></p>
+  <div class="row"><button class="hbtn" id="j-x">Avbryt</button></div>`);
+  const msg=t=>{$('j-msg').textContent=t};
+  $('j-x').onclick=close;
+  $('j-new').onclick=async()=>{
+    msg('Skapar…');
+    try{await loadFirebase();
+      const Fs=F.Fs,A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code='';
+      const r=new Uint32Array(8);crypto.getRandomValues(r);r.forEach(x=>code+=A[x%A.length]);
+      await Fs.setDoc(Fs.doc(F.db,'spaces',code),{name:(ownTeams()[0]||{}).name||'Lag',owner:user.uid,members:[user.uid],created:Date.now()});
+      CLOUD.space=code;CLOUD.last={};saveCloudState();close();startSync();renderHome();
+    }catch(e){msg(errText(e))}
+  };
+  $('j-go').onclick=()=>{
+    const code=$('j-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length<6){msg('Skriv lagkoden.');return}
+    ask('Gå med i lag '+code+'? Det som finns på den här enheten ersätts av lagets data i molnet. Exportera först om du har registrerat något här som du vill behålla.','Gå med',async()=>{
+      try{await loadFirebase();
+        const Fs=F.Fs,ref=Fs.doc(F.db,'spaces',code),snap=await Fs.getDoc(ref);
+        if(!snap.exists()){open(`<h3>Hittar inte lagkoden</h3><p>Kontrollera koden och försök igen.</p><div class="row"><button class="hbtn" id="x-c">OK</button></div>`);$('x-c').onclick=chooseSpace;return}
+        if(!(snap.data().members||[]).includes(user.uid))await Fs.updateDoc(ref,{members:Fs.arrayUnion(user.uid)});
+        DB={teams:[],matches:[],fixtures:[],table:null,seed:DB.seed};S=null;orphans={};
+        CLOUD.space=code;CLOUD.last={};saveLocal();saveCloudState();startSync();show('home');
+      }catch(e){open(`<h3>Kunde inte gå med</h3><p>${esc(errText(e))}</p><div class="row"><button class="hbtn" id="x-c">OK</button></div>`);$('x-c').onclick=close}
+    });
+  };
+}
+if(CLOUD.space||CLOUD.used)loadFirebase().catch(()=>{});
 
 save();
 show('home');
