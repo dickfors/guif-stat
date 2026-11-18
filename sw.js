@@ -1,6 +1,6 @@
 // Guif Matchstatistik – gör att appen fungerar utan internet.
 // Höj versionen när appen uppdateras så att telefonerna hämtar den nya.
-const CACHE='guif-stat-v2';
+const CACHE='guif-stat-v3';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 const FB='https://www.gstatic.com/firebasejs/10.12.2/';
 const FB_FILES=[FB+'firebase-app.js',FB+'firebase-auth.js',FB+'firebase-firestore.js'];
