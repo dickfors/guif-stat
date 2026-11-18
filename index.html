@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#d71920">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Guif Stat">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Guif Matchstatistik</title>
+<style>
+:root{--bg:#111113;--panel:#1c1c1f;--line:#2f2f34;--txt:#f5f5f5;--mut:#a3a3ab;--us:#d71920;--usd:#7d1015;--them:#a9bccf;--themd:#33465a;--good:#27ae60;--bad:#eb5757}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;border:0;border-radius:12px;cursor:pointer;touch-action:manipulation}
+.view{display:none;height:100%;flex-direction:column}
+.view.on{display:flex}
+.badge{background:var(--us);color:#fff;font-weight:900;font-style:italic;letter-spacing:1px;padding:5px 11px;border-radius:8px;font-size:17px;box-shadow:inset 0 -3px 0 #0003}
+header{border-top:3px solid var(--us);display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.score{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums}
+.tname{font-weight:700;font-size:15px;max-width:20vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clock{font-size:26px;font-variant-numeric:tabular-nums;font-weight:700;min-width:84px;text-align:center}
+.hbtn{background:#263445;padding:10px 14px;font-weight:600;font-size:15px}
+.hbtn.go{background:var(--good)}
+.hbtn.stop{background:var(--bad)}
+.spacer{flex:1}
+.sm{display:none}
+.cols{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;min-height:0}
+.side{border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.side.us{background:linear-gradient(#3d0d11,#1e1113);border-top:4px solid var(--us)}
+.side.them{background:linear-gradient(#1f2b38,#161b21);border-top:4px solid var(--them)}
+.side h2{margin:0;font-size:18px;display:flex;justify-content:space-between;align-items:center;min-height:40px}
+.evgrid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ev{font-size:23px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:90px}
+.ev small{font-size:13px;font-weight:500;opacity:.8}
+.us .ev{background:var(--usd)} .us .ev.main{background:var(--us)}
+.them .ev{background:var(--themd)} .them .ev.main{background:var(--them);color:#0e1620}
+.ev:active{transform:scale(.97);filter:brightness(1.2)}
+.gk{font-size:14px}
+.log{padding:0 12px 12px;display:flex;gap:8px;align-items:center;overflow-x:auto;white-space:nowrap}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 11px;font-size:13px}
+.chip.us{border-color:var(--us)} .chip.them{border-color:var(--them)}
+.undo{background:var(--bad);padding:10px 16px;font-weight:700;flex:none}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:9;padding:16px}
+#ov.on{display:flex}
+.sheet{background:var(--panel);border-radius:18px;padding:18px;width:min(720px,100%);max-height:94vh;overflow:auto}
+.sheet h3{margin:0 0 12px;font-size:20px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:10px}
+.pbtn{background:#263445;padding:12px 6px;display:flex;flex-direction:column;align-items:center}
+.pbtn b{font-size:28px} .pbtn span{font-size:13px;color:var(--mut)}
+.pbtn.gkp{box-shadow:inset 0 0 0 2px var(--good)}
+.row{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:340px;margin:10px auto 0}
+.keypad button{background:#263445;font-size:26px;padding:13px}
+.keypad .ok{background:var(--them);color:#0e1620;font-weight:800}
+.disp{text-align:center;font-size:40px;font-weight:800;min-height:50px}
+.sub{color:var(--mut);font-size:14px;margin:12px 0 6px}
+svg.goal{width:100%;max-width:640px;display:block;margin:0 auto;touch-action:manipulation}
+.scroll{flex:1;overflow:auto;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:start}
+.card{background:var(--panel);border-radius:16px;padding:14px}
+.card h3{margin:0 0 10px;font-size:14px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:center}
+th{color:var(--mut);font-weight:600;font-size:13px}
+td:first-child,th:first-child{text-align:left}
+.big td{font-size:24px;font-weight:800} .big td:first-child{font-size:16px;font-weight:500}
+.cus{color:#ff4d55}.cthem{color:var(--them)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.filters button{background:#263445;padding:8px 12px;font-size:14px}
+.filters button.on{background:var(--txt);color:var(--bg)}
+.wide{grid-column:1/-1}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.legend{display:flex;gap:14px;justify-content:center;font-size:13px;color:var(--mut);margin-top:8px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.setup{flex:1;overflow:auto;padding:16px;max-width:760px;margin:0 auto;width:100%}
+label{display:block;margin:14px 0 6px;color:var(--mut);font-size:14px}
+input,textarea{width:100%;background:#0b1118;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:16px;user-select:text;-webkit-user-select:text}
+textarea{min-height:250px;font-family:ui-monospace,Menlo,monospace}
+.note{color:var(--mut);font-size:13px}
+.primary{background:var(--us);padding:14px 20px;font-weight:700;font-size:17px}
+.empty{color:var(--mut);font-size:14px}
+/* iPhone stående */
+@media (max-width:700px){
+ header{gap:4px;padding:8px;justify-content:space-between;flex-wrap:nowrap}
+ header .spacer,.tname,.lbl{display:none}
+ .sm{display:inline}
+ .badge{font-size:14px;padding:4px 8px}
+ .score{font-size:26px}.clock{font-size:19px;min-width:54px}
+ .hbtn{padding:8px 9px;font-size:14px}
+ .cols{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:8px;padding:8px}
+ .side{padding:10px;gap:8px;border-radius:14px}
+ .side h2{font-size:15px;min-height:32px}
+ .gk{font-size:13px;padding:6px 10px}
+ .evgrid{gap:8px}
+ .ev{min-height:0;font-size:18px;border-radius:12px}
+ .ev small{font-size:11px}
+ .log{padding:0 8px 8px}
+ .undo{padding:10px 12px}
+ #ov{padding:8px;align-items:flex-end}
+ .sheet{padding:14px;max-height:96vh;border-radius:18px}
+ .sheet h3{font-size:17px}
+ .pgrid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px}
+ .pbtn{padding:10px 4px}.pbtn b{font-size:24px}.pbtn span{font-size:11px}
+ .keypad button{font-size:24px;padding:12px}
+ .disp{font-size:34px;min-height:42px}
+ .scroll{grid-template-columns:1fr;padding:10px;gap:10px}
+ .big td{font-size:20px}
+ .two{grid-template-columns:1fr 1fr;gap:10px}
+ td,th{padding:7px 4px;font-size:14px}
+ #st-title{font-size:14px}
+}
+/* iPhone liggande */
+@media (max-height:500px) and (orientation:landscape){
+ header{padding:5px 10px;gap:8px}
+ .tname,.lbl{display:none}
+ .sm{display:inline}
+ .badge{font-size:13px;padding:3px 8px}
+ .score{font-size:24px}.clock{font-size:18px;min-width:56px}
+ .hbtn{padding:6px 10px;font-size:13px}
+ .cols{grid-template-columns:1fr 1fr;grid-template-rows:1fr;gap:8px;padding:6px 8px}
+ .side{padding:8px;gap:6px}
+ .side h2{font-size:14px;min-height:28px}
+ .gk{font-size:12px;padding:5px 8px}
+ .evgrid{gap:6px}
+ .ev{min-height:0;font-size:16px}
+ .ev small{display:none}
+ .log{padding:0 8px 6px}
+ .undo{padding:7px 12px}
+ .chip{padding:5px 9px}
+ #ov{padding:6px}
+ .sheet{padding:12px;max-height:98vh}
+ .pgrid{grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px}
+ .pbtn{padding:6px 4px}.pbtn b{font-size:20px}
+ svg.goal{max-width:420px}
+ .keypad{grid-template-columns:repeat(6,1fr);max-width:420px}
+ .keypad button{padding:8px;font-size:20px}
+ .disp{font-size:28px;min-height:34px}
+ .scroll{grid-template-columns:1fr 1fr}
+}
+
+:root{color-scheme:dark}
+.page{flex:1;overflow:auto;padding:16px;max-width:960px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:14px}
+.page>label{margin-bottom:0}
+select{width:100%;background:#0b0b0d;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:16px}
+.chk{display:flex;align-items:center;gap:10px;color:var(--txt)}
+.chk input{width:22px;height:22px;accent-color:var(--us)}
+.hgrid{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+.bigbtn{font-size:20px;padding:22px;font-weight:800;border-radius:16px}
+.item{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;background:#26262c;padding:14px;margin-bottom:8px;text-align:left}
+.item:active{filter:brightness(1.25)}
+.item small{display:block;color:var(--mut);font-size:13px;margin-top:3px}
+.item .r{color:var(--mut);white-space:nowrap;display:flex;align-items:center;gap:8px}
+.sc{font-size:20px;color:var(--txt);font-variant-numeric:tabular-nums}
+.sc.win{color:#4cd07d}.sc.loss{color:#ff6b6b}.sc.draw{color:#ffd43b}
+.live{background:var(--good);color:#fff;font-size:11px;padding:2px 8px;border-radius:999px;margin-left:6px;text-transform:none;letter-spacing:0}
+.menu{display:flex;flex-direction:column;gap:10px}.menu .hbtn{padding:14px;text-align:left}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.kpis div{background:var(--panel);border-radius:14px;padding:14px;text-align:center}
+.kpis b{display:block;font-size:28px;font-variant-numeric:tabular-nums}
+.kpis span{color:var(--mut);font-size:13px}
+table.click tr[data-pid],table.click tr[data-mid]{cursor:pointer}
+table.click tr[data-pid]:active,table.click tr[data-mid]:active{background:#2a2a30}
+table.tbl td,table.tbl th{padding:6px 4px;font-size:14px}
+table.tbl td:nth-child(2),table.tbl th:nth-child(2){text-align:left}
+table.tbl tr.me td{color:#ff4d55;font-weight:700}
+small.mut{color:var(--mut);font-size:12px}
+@media (max-width:700px){.hgrid{grid-template-columns:1fr}.bigbtn{padding:18px}.page{padding:10px;gap:10px}.kpis b{font-size:22px}}
+</style>
+</head>
+<body>
+
+<!-- ===== START ===== -->
+<section id="v-home" class="view">
+  <header><span class="badge">GUIF</span><b style="font-size:18px">Matchstatistik</b></header>
+  <div class="page" id="home"></div>
+</section>
+
+<!-- ===== LAG ===== -->
+<section id="v-team" class="view">
+  <header><button class="hbtn" id="t-back">←<span class="lbl"> Startskärmen</span></button><b id="t-title"></b></header>
+  <div class="page">
+    <label for="t-name">Lagnamn</label><input id="t-name">
+    <label>Typ av lag</label>
+    <div class="filters" id="t-type"><button data-v="own">Eget lag</button><button data-v="opp">Motståndare</button></div>
+    <label for="t-roster" id="t-rlabel"></label>
+    <textarea id="t-roster"></textarea>
+    <p class="note">En spelare per rad med nummer först, till exempel "7 Elsa". Spelarna behåller sin statistik så länge de har samma nummer.</p>
+    <div class="row"><button class="hbtn stop" id="t-del">Ta bort lag</button><button class="primary" id="t-save">Spara lag</button></div>
+  </div>
+</section>
+
+<!-- ===== NY MATCH ===== -->
+<section id="v-new" class="view">
+  <header><button class="hbtn" id="n-back">←<span class="lbl"> Startskärmen</span></button><b>Ny match</b></header>
+  <div class="page">
+    <label for="n-team">Vårt lag</label><select id="n-team"></select>
+    <label for="n-opp">Motståndare</label><select id="n-opp"></select>
+    <input id="n-oppname" placeholder="Namn på motståndarlaget" style="margin-top:8px">
+    <label for="n-date">Datum</label><input type="date" id="n-date">
+    <label for="n-opproster">Motståndarnas matchtrupp (valfritt)</label>
+    <textarea id="n-opproster" style="min-height:150px" placeholder="4 Lisa&#10;9 Johanna&#10;15 Moa"></textarea>
+    <label class="chk"><input type="checkbox" id="n-saveopp" checked> Spara motståndarlaget och truppen till nästa gång</label>
+    <div class="row"><button class="primary" id="n-start">Starta match</button></div>
+  </div>
+</section>
+
+<!-- ===== MATCH ===== -->
+<section id="v-match" class="view">
+  <header>
+    <span class="badge">GUIF</span>
+    <span class="tname cus" id="h-us"></span><span class="score" id="h-score">0–0</span><span class="tname cthem" id="h-them"></span>
+    <span class="spacer"></span>
+    <button class="hbtn" id="b-half"></button>
+    <span class="clock" id="h-clock">00:00</span>
+    <button class="hbtn go" id="b-clock">Start</button>
+    <button class="hbtn" id="b-stats">📊<span class="lbl"> Översikt</span></button>
+    <button class="hbtn" id="b-menu" aria-label="Meny">⚙︎</button>
+  </header>
+  <div class="cols">
+    <div class="side us">
+      <h2><span id="s-us"></span><button class="hbtn gk" id="b-gk">🧤 MV: –</button></h2>
+      <div class="evgrid">
+        <button class="ev main" data-side="us" data-type="goal">Mål<small>skytt + plats i mål</small></button>
+        <button class="ev" data-side="us" data-type="miss">Utanför<small>välj skytt</small></button>
+        <button class="ev" data-side="us" data-type="saved">Räddad<small>deras MV räddar</small></button>
+        <button class="ev" data-side="us" data-type="tf">Tekniskt fel<small>välj spelare</small></button>
+      </div>
+    </div>
+    <div class="side them">
+      <h2><span id="s-them"></span></h2>
+      <div class="evgrid">
+        <button class="ev main" data-side="them" data-type="goal">Mål<small>skytt + plats i mål</small></button>
+        <button class="ev" data-side="them" data-type="miss">Utanför</button>
+        <button class="ev" data-side="them" data-type="save">Vår räddning<small>skytt + plats i mål</small></button>
+        <button class="ev" data-side="them" data-type="tf">Tekniskt fel</button>
+      </div>
+    </div>
+  </div>
+  <div class="log"><button class="undo" id="b-undo">↶ Ångra</button><div id="log" style="display:flex;gap:8px"></div></div>
+</section>
+
+<!-- ===== MATCHÖVERSIKT ===== -->
+<section id="v-stats" class="view">
+  <header><button class="hbtn" id="b-back">←<span class="lbl" id="b-back-l"> Matchen</span></button><span class="spacer"></span><b id="st-title" style="text-align:center"></b><span class="spacer"></span><button class="hbtn" id="b-copy">📋<span class="lbl"> Kopiera sammanfattning</span></button></header>
+  <div class="scroll" id="stats"></div>
+</section>
+
+<!-- ===== SPELARSTATISTIK ===== -->
+<section id="v-players" class="view">
+  <header><button class="hbtn" id="ps-back">←<span class="lbl"> Startskärmen</span></button><b>Spelarstatistik</b></header>
+  <div class="page" id="players"></div>
+</section>
+
+<!-- ===== EN SPELARE ===== -->
+<section id="v-player" class="view">
+  <header><button class="hbtn" id="p-back">←<span class="lbl"> Alla spelare</span></button><b id="p-title"></b></header>
+  <div class="page" id="player"></div>
+</section>
+
+<div id="ov"><div class="sheet" id="sheet"></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const today=()=>new Date().toLocaleDateString('sv-SE');
+const DEMO="1 Ella MV\n16 Saga MV\n3 Alva\n5 Wilma\n7 Elsa\n8 Maja\n9 Ebba\n10 Alice\n11 Nora\n14 Vera\n18 Tilde\n21 Agnes";
+const K='guifstat-v2';
+const pct=(a,b)=>b?Math.round(a/b*100)+'%':'–';
+
+/* ---------- roster helpers ---------- */
+function parseRoster(t,old){
+  old=old||[];
+  return t.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+    const m=l.match(/^(\d+)\s*(.*)$/);if(!m)return null;
+    let num=m[1],rest=m[2].trim();
+    const gk=/(^|\s)MV$/i.test(rest);if(gk)rest=rest.replace(/\s*MV$/i,'').trim();
+    const o=old.find(p=>p.num===num);
+    return{id:o?o.id:'n'+num,num,name:rest||('#'+num),gk};
+  }).filter(Boolean);
+}
+function rosterText(ps,withGk){return(ps||[]).map(p=>p.num+' '+p.name+(withGk&&p.gk?' MV':'')).join('\n')}
+
+/* ---------- data ---------- */
+let DB=null;try{DB=JSON.parse(localStorage.getItem(K))}catch(e){}
+if(!DB||!DB.teams)DB={teams:[],matches:[]};
+try{ /* flytta över match från tidigare prototyp */
+  const o=JSON.parse(localStorage.getItem('hbstat-v1'));
+  if(o&&o.players&&o.players.length&&!DB.teams.length){
+    const t={id:uid(),name:(!o.team||o.team==='Vårt lag')?'Eskilstuna Guif Dam':o.team,type:'own',players:o.players};
+    DB.teams.push(t);
+    if(o.events&&o.events.length)DB.matches.push({id:uid(),date:today(),teamId:t.id,team:t.name,opp:o.opp||'Motståndare',oppPlayers:o.oppPlayers||[],players:o.players.map(p=>({...p})),events:o.events,half:o.half||1,clock:o.clock||{run:false,at:0,el:0},gk:o.gk,done:false,created:Date.now()});
+  }
+}catch(e){}
+if(!DB.teams.length)DB.teams.push({id:'guif-dam',name:'Eskilstuna Guif Dam',type:'own',players:parseRoster(DEMO)});
+/* ---------- data från Profixio (Dam 1 norra 2026/27, hämtad 18 nov 2026) ---------- */
+const SEED_V=1;
+if((DB.seed||0)<SEED_V){
+  const OPP=['Hammarby IF HF','VästeråsIrsta HK','Skånela IF','Rimbo HK Roslagen','Nacka HK','Bodens BK HF','Huddinge HK','Lidingö SK','IK Bolton','Strands IF Hudiksvall','Enköpings HF'];
+  OPP.forEach(nm=>{if(!DB.teams.some(t=>t.name===nm))DB.teams.push({id:uid(),name:nm,type:'opp',players:[]})});
+  DB.fixtures=[
+    {id:'r8',round:8,date:'2026-11-21',time:'14:00',opp:'Strands IF Hudiksvall',home:false,venue:'Oilquick Arena'},
+    {id:'r9',round:9,date:'2026-11-28',time:'17:00',opp:'Bodens BK HF',home:true,venue:'Volvo CE Arena'},
+    {id:'r10',round:10,date:'2026-12-05',time:'16:00',opp:'Lidingö SK',home:false,venue:'Gångsätrahallen, Lidingö'}];
+  DB.table={name:'Dam 1 norra',fetched:'2026-11-18',url:'https://www.profixio.com/app/lx/competition/leagueid28140/category/1182259?matchgroup=3406159',rows:[
+    ['Hammarby IF HF',7,6,1,0,13],['VästeråsIrsta HK',7,5,1,1,11],['Eskilstuna Guif IF',7,5,0,2,10],['Skånela IF',7,4,1,2,9],
+    ['Rimbo HK Roslagen',7,4,0,3,8],['Nacka HK',7,3,0,4,6],['Bodens BK HF',6,3,0,3,6],['Huddinge HK',6,2,0,4,4],
+    ['Lidingö SK',6,2,0,4,4],['IK Bolton',6,2,0,4,4],['Strands IF Hudiksvall',7,1,1,5,3],['Enköpings HF',7,1,0,6,2]]};
+  DB.seed=SEED_V;
+}
+const SEED_V2=2;
+if((DB.seed||0)<SEED_V2){
+  const own=DB.teams.find(t=>t.type==='own');
+  const R=[[1,'2026-09-30','19:00','Huddinge HK',true,'Volvo CE Arena A1',21,22],
+    [2,'2026-10-04','17:00','VästeråsIrsta HK',false,'Expandia Arena A',28,23],
+    [3,'2026-10-10','14:30','Nacka HK',true,'Volvo CE Arena',34,25],
+    [4,'2026-10-17','17:00','Hammarby IF HF',false,'Skärholmshallen',18,28],
+    [5,'2026-10-25','16:00','Enköpings HF',true,'Volvo CE Arena A1',30,27],
+    [6,'2026-11-07','15:00','Rimbo HK Roslagen',true,'Volvo CE Arena A1',32,28],
+    [7,'2026-11-15','15:00','Skånela IF',false,'Vikingahallen A',33,30]];
+  if(own)R.forEach(([rd,date,time,opp,home,venue,us,them])=>{
+    if(DB.matches.some(m=>m.importId==='r'+rd))return;
+    DB.matches.push({id:uid(),importId:'r'+rd,round:rd,date,time,home,venue,teamId:own.id,team:own.name,opp,oppPlayers:[],players:own.players.map(p=>({...p})),events:[],half:2,clock:{run:false,at:0,el:0},gk:null,done:true,result:{us,them},created:Date.parse(date)});
+  });
+  DB.seed=SEED_V2;
+}
+const SEED_V3=3;
+if((DB.seed||0)<SEED_V3){
+  const own=DB.teams.find(t=>t.type==='own');
+  if(own){
+    own.players=parseRoster(`1 Ebba Ekström MV
+12 Maelys Tsenuokpor MV
+2 Denise Vallo
+4 Linnéa Strömberg
+6 Alva Ståhlberg
+7 Lova Engström
+8 Fanny Holmkvist
+9 Sofie Olsson
+10 Thea Axdorph
+11 Moa Esentals
+13 Anna Björk Heikkisdóttir
+14 Lily Ikävalko
+17 Hanna Hermansson
+18 Cajsa Sällström
+20 Majken Settlin
+21 Armida Malmqvist
+22 Frida Wikblad
+23 Moa Hjalmarsson
+24 Matilda Gillström`,[]);
+    DB.matches.filter(m=>m.teamId===own.id&&!m.events.length).forEach(m=>{m.players=own.players.map(p=>({...p}));m.gk=null});
+  }
+  DB.seed=SEED_V3;
+}
+function save(){try{localStorage.setItem(K,JSON.stringify(DB))}catch(e){}}
+const team=id=>DB.teams.find(t=>t.id===id);
+const ownTeams=()=>DB.teams.filter(t=>t.type==='own');
+const oppTeams=()=>DB.teams.filter(t=>t.type==='opp');
+const goalsOf=(m,side)=>(m.result&&!m.events.length)?m.result[side]:m.events.filter(e=>e.side===side&&e.type==='goal').length;
+const scoreOf=m=>goalsOf(m,'us')+'–'+goalsOf(m,'them');
+const fmtDate=d=>{if(!d)return'';const x=new Date(d+'T12:00');return x.toLocaleDateString('sv-SE',{day:'numeric',month:'short',year:'numeric'})};
+
+let S=null; /* matchen som visas */
+
+/* ---------- match helpers ---------- */
+function secs(){return S.clock.el+(S.clock.run?(Date.now()-S.clock.at)/1000:0)}
+function fmt(s){s=Math.floor(s);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function pl(id){return S.players.find(p=>p.id===id)}
+function plName(id){const p=pl(id);return p?('#'+p.num+' '+p.name):'okänd'}
+function ev(side,type,f){return S.events.filter(e=>e.side===side&&e.type===type&&(!f||f(e)))}
+function n(side,type,f){return ev(side,type,f).length}
+function oppName(u){const p=(S.oppPlayers||[]).find(p=>p.num===u);return p?p.name:''}
+function oppLabel(u){return u?('#'+u+(oppName(u)?' '+oppName(u):'')):'okänt nr'}
+
+/* ---------- overlay ---------- */
+function open(html){$('sheet').innerHTML=html;$('ov').classList.add('on')}
+function close(){$('ov').classList.remove('on');$('sheet').innerHTML=''}
+$('ov').addEventListener('click',e=>{if(e.target.id==='ov')close()});
+function ask(msg,okText,cb){
+  open(`<h3>${esc(msg)}</h3><div class="row"><button class="hbtn" id="a-no">Avbryt</button><button class="hbtn stop" id="a-yes">${esc(okText)}</button></div>`);
+  $('a-no').onclick=close;$('a-yes').onclick=()=>{close();cb()};
+}
+
+/* ---------- navigation ---------- */
+const R={home:renderHome,team:renderTeam,new:renderNew,match:renderMatch,stats:renderStats,players:renderPlayers,player:renderPlayer};
+function show(v){
+  document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
+  R[v]();window.scrollTo(0,0);
+}
+
+/* =========================================================
+   STARTSKÄRM
+   ========================================================= */
+function item(attr,left,sub,right){return `<button class="item" ${attr}><span><b>${left}</b>${sub?`<small>${sub}</small>`:''}</span><span class="r">${right||'›'}</span></button>`}
+function renderHome(){
+  const ms=[...DB.matches].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.created-a.created);
+  const live=ms.filter(m=>!m.done),done=ms.filter(m=>m.done);
+  $('home').innerHTML=`
+  <div class="hgrid">
+    <button class="primary bigbtn" id="h-new">＋ Ny match</button>
+    <button class="hbtn bigbtn" id="h-players">📈 Spelarstatistik</button>
+  </div>
+  ${(()=>{const fx=(DB.fixtures||[]).filter(f=>!DB.matches.some(m=>m.fixtureId===f.id));
+    return fx.length?`<div class="card"><h3>Kommande matcher · Dam 1 norra</h3>${fx.map(f=>item(`data-fx="${f.id}"`,(f.home?'🏠 ':'🚌 ')+esc(f.opp),`${fmtDate(f.date)} kl ${f.time} · ${esc(f.venue)} · omg ${f.round}`,'Starta ›')).join('')}</div>`:''})()}
+  ${live.length?`<div class="card"><h3>Pågående match</h3>${live.map(m=>item(`data-live="${m.id}"`,esc(m.team)+' – '+esc(m.opp),fmtDate(m.date),`<b class="sc">${scoreOf(m)}</b> Fortsätt ›`)).join('')}</div>`:''}
+  <div class="card"><h3>Tidigare matcher</h3>${done.length?done.map(m=>{
+      const u=goalsOf(m,'us'),t=goalsOf(m,'them'),r=u>t?'win':u<t?'loss':'draw';
+      return item(`data-m="${m.id}"`,(m.home===false?'🚌 ':m.home?'🏠 ':'')+esc(m.opp),fmtDate(m.date)+(m.round?' · omg '+m.round:'')+(m.result&&!m.events.length?' · endast resultat':' · '+esc(m.team)),`<b class="sc ${r}">${u}–${t}</b> ›`)}).join(''):'<p class="empty">Inga avslutade matcher än.</p>'}</div>
+  ${DB.table?`<div class="card"><h3>Tabell ${esc(DB.table.name)}</h3><table class="tbl"><tr><th>#</th><th>Lag</th><th>M</th><th>V</th><th>O</th><th>F</th><th>P</th></tr>
+    ${DB.table.rows.map((r,i)=>`<tr class="${/guif/i.test(r[0])?'me':''}"><td>${i+1}</td><td>${esc(r[0])}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td><b>${r[5]}</b></td></tr>`).join('')}</table>
+    <p class="note">Från Profixio ${fmtDate(DB.table.fetched)}. Uppdateras inte automatiskt. <a href="${esc(DB.table.url)}" style="color:var(--them)">Öppna i Profixio</a></p></div>`:''}
+  <div class="card"><h3>Lag</h3>
+    <div class="sub" style="margin-top:0">Egna lag</div>
+    ${ownTeams().map(t=>item(`data-t="${t.id}"`,esc(t.name),t.players.length+' spelare')).join('')||'<p class="empty">Inga egna lag.</p>'}
+    <div class="sub">Motståndare</div>
+    ${oppTeams().map(t=>item(`data-t="${t.id}"`,esc(t.name),t.players.length?t.players.length+' spelare':'ingen trupp')).join('')||'<p class="empty">Sparas automatiskt när du startar en match.</p>'}
+    <div class="row"><button class="hbtn" id="h-addteam">＋ Nytt lag</button></div>
+  </div>
+  <div class="card"><h3>Säkerhetskopia och dela data</h3>
+    <p class="note" style="margin-top:0">Allt sparas bara på den här enheten. Exportera efter varje match så har du en backup. Filen kan också skickas till en annan tränare, som importerar den i sin app.</p>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="h-exp">📤 Exportera allt</button><button class="hbtn" id="h-imp">📥 Importera fil</button></div>
+    <input type="file" id="h-file" accept=".json,application/json" style="display:none">
+  </div>`;
+  $('h-exp').onclick=()=>exportData(DB,'guif-statistik-'+today());
+  $('h-imp').onclick=()=>$('h-file').click();
+  $('h-file').onchange=e=>{const f=e.target.files[0];if(f)importFile(f);e.target.value=''};
+  $('h-new').onclick=()=>{if(!ownTeams().length)openTeam(null,'own');else show('new')};
+  $('h-players').onclick=()=>show('players');
+  $('home').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{pendingFx=(DB.fixtures||[]).find(f=>f.id===b.dataset.fx);show('new')});
+  $('h-addteam').onclick=()=>openTeam(null,'own');
+  $('home').querySelectorAll('[data-live]').forEach(b=>b.onclick=()=>{S=DB.matches.find(m=>m.id===b.dataset.live);show('match')});
+  $('home').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S=DB.matches.find(m=>m.id===b.dataset.m);resetMap();show('stats')});
+  $('home').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>openTeam(b.dataset.t));
+}
+
+/* =========================================================
+   LAG
+   ========================================================= */
+let editTeam=null,editType='own';
+function openTeam(id,type){editTeam=id?team(id):null;editType=editTeam?editTeam.type:(type||'own');show('team')}
+function renderTeam(){
+  $('t-title').textContent=editTeam?editTeam.name:'Nytt lag';
+  $('t-name').value=editTeam?editTeam.name:'';
+  $('t-roster').value=editTeam?rosterText(editTeam.players,true):'';
+  $('t-del').style.display=editTeam?'':'none';
+  setType(editType);
+}
+function setType(v){
+  editType=v;
+  $('t-type').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  $('t-rlabel').textContent=v==='own'?'Trupp: nummer och namn, skriv MV sist för målvakt':'Trupp (valfritt): nummer och namn';
+  $('t-roster').placeholder=v==='own'?'1 Ella MV\n7 Elsa\n8 Maja':'4 Lisa\n9 Johanna';
+}
+$('t-type').querySelectorAll('button').forEach(b=>b.onclick=()=>setType(b.dataset.v));
+$('t-back').onclick=()=>show('home');
+$('t-save').onclick=()=>{
+  const name=$('t-name').value.trim()||'Namnlöst lag';
+  const players=parseRoster($('t-roster').value,editTeam?editTeam.players:[]);
+  if(editTeam){
+    Object.assign(editTeam,{name,type:editType,players});
+    DB.matches.filter(m=>!m.done&&m.teamId===editTeam.id).forEach(m=>{m.team=name;m.players=players.map(p=>({...p}))});
+  }else DB.teams.push({id:uid(),name,type:editType,players});
+  save();show('home');
+};
+$('t-del').onclick=()=>ask('Ta bort '+editTeam.name+'? Sparade matcher finns kvar.','Ta bort',()=>{DB.teams=DB.teams.filter(t=>t!==editTeam);save();show('home')});
+
+/* =========================================================
+   NY MATCH
+   ========================================================= */
+let pendingFx=null;
+function renderNew(){
+  $('n-team').innerHTML=ownTeams().map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  $('n-opp').innerHTML='<option value="">＋ Nytt motståndarlag</option>'+oppTeams().map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  $('n-oppname').value='';$('n-opproster').value='';$('n-date').value=today();$('n-saveopp').checked=true;
+  if(pendingFx){
+    const t=oppTeams().find(o=>o.name===pendingFx.opp);
+    if(t)$('n-opp').value=t.id;else $('n-oppname').value=pendingFx.opp;
+    $('n-date').value=pendingFx.date;
+  }
+  oppChanged();
+}
+function oppChanged(){
+  const t=team($('n-opp').value);
+  $('n-oppname').style.display=t?'none':'';
+  if(t)$('n-opproster').value=rosterText(t.players,false);
+}
+$('n-opp').onchange=oppChanged;
+$('n-back').onclick=()=>{pendingFx=null;show('home')};
+$('n-start').onclick=()=>{
+  const t=team($('n-team').value);if(!t)return;
+  const oppT=team($('n-opp').value);
+  const opp=oppT?oppT.name:($('n-oppname').value.trim()||'Motståndare');
+  const oppPlayers=parseRoster($('n-opproster').value,oppT?oppT.players:[]).map(p=>({id:p.id,num:p.num,name:p.name}));
+  if($('n-saveopp').checked){
+    if(oppT)oppT.players=oppPlayers.map(p=>({...p,gk:false}));
+    else if($('n-oppname').value.trim())DB.teams.push({id:uid(),name:opp,type:'opp',players:oppPlayers.map(p=>({...p,gk:false}))});
+  }
+  const g=t.players.find(p=>p.gk);
+  S={id:uid(),date:$('n-date').value||today(),teamId:t.id,team:t.name,opp,oppPlayers,players:t.players.map(p=>({...p})),events:[],half:1,clock:{run:false,at:0,el:0},gk:g?g.id:null,done:false,created:Date.now()};
+  if(pendingFx){S.fixtureId=pendingFx.id;S.venue=pendingFx.venue;pendingFx=null}
+  DB.matches.push(S);save();show('match');
+};
+
+/* =========================================================
+   MATCHLÄGE
+   ========================================================= */
+function describe(e){
+  const t=fmt(e.t)+' ';
+  if(e.side==='us')return t+{goal:'⚽ Mål ',miss:'↗ Utanför ',saved:'✋ Räddad ',tf:'⚠ TF '}[e.type]+(e.player?plName(e.player):'');
+  return t+{goal:'⚽ Mål '+oppLabel(e.num),miss:'↗ Utanför',save:'🧤 Räddning'+(e.num!==undefined?' mot '+oppLabel(e.num):''),tf:'⚠ TF'}[e.type];
+}
+function renderMatch(){
+  $('h-us').textContent=S.team;$('h-them').textContent=S.opp;$('s-us').textContent=S.team;$('s-them').textContent=S.opp;
+  $('h-score').textContent=scoreOf(S);
+  $('b-half').innerHTML=`<span class="sm">H${S.half}</span><span class="lbl">${S.half}:a halvlek</span>`;
+  const g=pl(S.gk);$('b-gk').textContent='🧤 MV: '+(g?'#'+g.num+' '+g.name:'välj');
+  const b=$('b-clock');b.textContent=S.clock.run?'Paus':'Start';b.className='hbtn '+(S.clock.run?'stop':'go');
+  $('h-clock').textContent=fmt(secs());
+  $('log').innerHTML=S.events.slice(-8).reverse().map(e=>`<button class="chip ${e.side}" data-id="${e.id}">${esc(describe(e))}</button>`).join('');
+  $('log').querySelectorAll('.chip').forEach(c=>c.onclick=()=>ask('Ta bort: '+c.textContent+'?','Ta bort',()=>{S.events=S.events.filter(e=>e.id!==c.dataset.id);save();renderMatch()}));
+}
+setInterval(()=>{if(S&&$('v-match').classList.contains('on'))$('h-clock').textContent=fmt(secs())},500);
+$('b-clock').onclick=()=>{if(S.clock.run){S.clock.el=secs();S.clock.run=false}else{S.clock.at=Date.now();S.clock.run=true}save();renderMatch()};
+$('b-half').onclick=()=>{S.half=S.half===1?2:1;save();renderMatch()};
+$('b-undo').onclick=()=>{if(!S.events.length)return;S.events.pop();save();renderMatch()};
+$('b-stats').onclick=()=>{resetMap();show('stats')};
+$('b-menu').onclick=()=>{
+  open(`<h3>Meny</h3><div class="menu">
+  <button class="hbtn stop" id="m-end">🏁 Avsluta matchen</button>
+  <button class="hbtn" id="m-home">🏠 Till startskärmen (matchen sparas som pågående)</button>
+  <button class="hbtn" id="m-close">Stäng</button></div>`);
+  $('m-end').onclick=()=>{close();ask('Avsluta matchen '+S.team+' – '+S.opp+' ('+scoreOf(S)+')?','Avsluta',()=>{S.clock.el=secs();S.clock.run=false;S.done=true;save();resetMap();show('stats')})};
+  $('m-home').onclick=()=>{close();show('home')};$('m-close').onclick=close;
+};
+$('b-gk').onclick=()=>pickPlayer('Vem står i mål?',true,p=>{S.gk=p;save();close();renderMatch()},false);
+
+function add(e){S.events.push(e);save();close();renderMatch()}
+document.querySelectorAll('.ev').forEach(b=>b.onclick=()=>register(b.dataset.side,b.dataset.type));
+function register(side,type){
+  const base={id:uid(),side,type,t:secs(),half:S.half};
+  if(side==='us'){
+    const title={goal:'Mål – vem gjorde det?',miss:'Skott utanför – vem sköt?',saved:'Deras målvakt räddade – vem sköt?',tf:'Tekniskt fel – vem?'}[type];
+    pickPlayer(title,false,p=>{
+      if(type==='goal')pickSpot('Mål av '+(p?plName(p):'okänd')+' – var gick bollen in?','ourgoal',pos=>add({...base,player:p,...pos}));
+      else add({...base,player:p});
+    },true);
+  }else if(type==='goal'){
+    pickNumber('Motståndarmål – vem gjorde det?',num=>pickSpot('Mål av '+oppLabel(num)+' – var gick bollen in?','goal',pos=>add({...base,num,gk:S.gk,...pos})));
+  }else if(type==='save'){
+    const g=pl(S.gk);
+    pickNumber('Räddning'+(g?' av '+g.name:'')+' – vem sköt?',num=>pickSpot('Skott av '+oppLabel(num)+' – var räddades det?','save',pos=>add({...base,num,gk:S.gk,...pos})));
+  }else add(base);
+}
+
+/* ---------- väljare ---------- */
+function pickPlayer(title,gkFirst,cb,allowNone){
+  const list=[...S.players].sort((a,b)=>(gkFirst?(b.gk-a.gk):(a.gk-b.gk))||(+a.num-+b.num));
+  open(`<h3>${esc(title)}</h3><div class="pgrid">${list.map(p=>`<button class="pbtn${p.gk?' gkp':''}" data-id="${p.id}"><b>${esc(p.num)}</b><span>${esc(p.name)}${p.gk?' · MV':''}</span></button>`).join('')}</div>
+  <div class="row">${allowNone?'<button class="hbtn" id="pp-none">Utan spelare</button>':''}<button class="hbtn" id="pp-x">Avbryt</button></div>`);
+  $('sheet').querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>cb(b.dataset.id));
+  if(allowNone)$('pp-none').onclick=()=>cb(null);
+  $('pp-x').onclick=close;
+}
+function pickNumber(title,cb){
+  const used=S.events.filter(e=>e.side==='them'&&e.num).map(e=>e.num);
+  const all=[...new Set([...(S.oppPlayers||[]).map(p=>p.num),...used])].sort((a,b)=>a-b);
+  let v='';
+  open(`<h3>${esc(title)}</h3>
+  ${all.length?`<div class="pgrid">${all.map(u=>{const g=n('them','goal',e=>e.num===u),nm=oppName(u);return `<button class="pbtn" data-n="${esc(u)}"><b>${esc(u)}</b><span>${esc(nm)}${g?(nm?' · ':'')+g+' mål':''}</span></button>`}).join('')}</div><div class="sub">Annat nummer</div>`:''}
+  <div class="disp" id="kp-d">–</div>
+  <div class="keypad">${[1,2,3,4,5,6,7,8,9].map(d=>`<button data-k="${d}">${d}</button>`).join('')}<button data-k="c">⌫</button><button data-k="0">0</button><button class="ok" data-k="ok">OK</button></div>
+  <div class="row"><button class="hbtn" id="kp-unk">Okänt nummer</button><button class="hbtn" id="kp-x">Avbryt</button></div>`);
+  $('sheet').querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>cb(b.dataset.n));
+  $('sheet').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k;
+    if(k==='ok'){if(v)cb(v);return}
+    if(k==='c')v=v.slice(0,-1);else if(v.length<2)v+=k;
+    $('kp-d').textContent=v||'–';
+  });
+  $('kp-unk').onclick=()=>cb('');$('kp-x').onclick=close;
+}
+function goalSVG(dots,zones){
+  let z='';
+  if(zones){for(let r=0;r<3;r++)for(let c=0;c<3;c++){const k=zones[r*3+c];if(k)z+=`<text x="${c*100+50}" y="${r*66.67+44}" text-anchor="middle" font-size="34" font-weight="800" fill="#ffffff30">${k}</text>`}}
+  const d=dots.map(p=>`<circle cx="${p.x*300}" cy="${p.y*200}" r="9" fill="${p.c}" stroke="#111113" stroke-width="2"/>`).join('');
+  return `<svg class="goal" viewBox="-20 -20 340 236" xmlns="http://www.w3.org/2000/svg">
+  <defs><pattern id="net" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 0L14 14M14 0L0 14" stroke="#ffffff1c" stroke-width="1"/></pattern></defs>
+  <line x1="-20" y1="204" x2="320" y2="204" stroke="#3a3a42" stroke-width="3"/>
+  <rect x="0" y="0" width="300" height="200" fill="#0b0b0d"/><rect x="0" y="0" width="300" height="200" fill="url(#net)"/>
+  <g stroke="#ffffff22" stroke-dasharray="4 6"><line x1="100" y1="0" x2="100" y2="200"/><line x1="200" y1="0" x2="200" y2="200"/><line x1="0" y1="66.67" x2="300" y2="66.67"/><line x1="0" y1="133.33" x2="300" y2="133.33"/></g>
+  ${z}
+  <path d="M-4 204V-4H304V204" fill="none" stroke="#fff" stroke-width="8"/>
+  <path d="M-4 204V-4H304V204" fill="none" stroke="#e03131" stroke-width="8" stroke-dasharray="20 20"/>
+  <g id="dots">${d}</g></svg>`;
+}
+function zonesOf(pts){const z=Array(9).fill(0);pts.forEach(p=>{z[Math.min(2,Math.floor(p.y*3))*3+Math.min(2,Math.floor(p.x*3))]++});return z}
+function pickSpot(title,kind,cb){
+  const col={goal:'#eb5757',save:'#27ae60',ourgoal:'#ffd43b'}[kind];
+  open(`<h3>${esc(title)}</h3><p class="sub" style="margin-top:0">Tryck i målet där bollen ${kind==='save'?'räddades':'gick in'}.</p>${goalSVG([],null)}
+  <div class="row"><button class="hbtn" id="sp-skip">Hoppa över</button><button class="hbtn" id="sp-x">Avbryt</button></div>`);
+  const svg=$('sheet').querySelector('svg');let done=false;
+  svg.addEventListener('pointerdown',e=>{
+    if(done)return;const r=svg.getBoundingClientRect();
+    let x=(-20+(e.clientX-r.left)/r.width*340)/300,y=(-20+(e.clientY-r.top)/r.height*236)/200;
+    x=Math.min(1,Math.max(0,x));y=Math.min(1,Math.max(0,y));done=true;
+    svg.querySelector('#dots').innerHTML=`<circle cx="${x*300}" cy="${y*200}" r="11" fill="${col}" stroke="#fff" stroke-width="3"/>`;
+    setTimeout(()=>cb({x:+x.toFixed(3),y:+y.toFixed(3)}),220);
+  });
+  $('sp-skip').onclick=()=>cb({});$('sp-x').onclick=close;
+}
+
+/* =========================================================
+   MATCHÖVERSIKT
+   ========================================================= */
+let mapTeam='them',mapF='all',mapP='';
+function resetMap(){mapTeam='them';mapF='all';mapP=''}
+function top5(side){
+  const m={};
+  ev(side,'goal').forEach(e=>{const k=side==='us'?(e.player||''):(e.num||'');m[k]=(m[k]||0)+1});
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>[side==='us'?(k?plName(k):'okänd'):oppLabel(k),v]);
+}
+function topList(arr){return arr.length?`<table>${arr.map(([a,b],i)=>`<tr><td>${i+1}. ${esc(a)}</td><td><b>${b}</b></td></tr>`).join('')}</table>`:'<p class="empty">Inga mål än</p>'}
+function renderStats(){
+  if(S.result&&!S.events.length){
+    $('st-title').textContent=S.team+' '+scoreOf(S)+' '+S.opp;$('b-back-l').textContent=' Startskärmen';
+    const u=S.result.us,t=S.result.them,r=u>t?'Vinst':u<t?'Förlust':'Oavgjort';
+    $('stats').innerHTML=`<div class="card wide" style="text-align:center"><h3>${r} · ${S.home?'hemma':'borta'}</h3>
+    <div style="font-size:56px;font-weight:900;font-variant-numeric:tabular-nums"><span class="cus">${u}</span>–<span class="cthem">${t}</span></div>
+    <p class="sub">${esc(S.team)} – ${esc(S.opp)}<br>${fmtDate(S.date)} kl ${esc(S.time||'')} · ${esc(S.venue||'')} · omgång ${S.round||'–'}</p>
+    <p class="note">Resultatet är hämtat från Profixio. Ingen statistik registrerades i appen under den här matchen.</p></div>
+    <div class="card wide"><div class="row" style="margin:0"><button class="hbtn stop" id="st-del">🗑 Radera matchen</button></div></div>`;
+    $('st-del').onclick=()=>ask('Radera matchen mot '+S.opp+'?','Radera',()=>{DB.matches=DB.matches.filter(m=>m!==S);S=null;save();show('home')});
+    return;
+  }
+  $('st-title').textContent=S.team+' '+scoreOf(S)+' '+S.opp;
+  $('b-back-l').textContent=S.done?' Startskärmen':' Matchen';
+  const rows=[['Mål',n('us','goal'),n('them','goal')],['Tekniska fel',n('us','tf'),n('them','tf')],['Räddningar',n('them','save'),n('us','saved')],['Skott utanför',n('us','miss'),n('them','miss')]];
+  const h=hf=>n('us','goal',e=>e.half===hf)+'–'+n('them','goal',e=>e.half===hf);
+  const ps=S.players.map(p=>{
+    const g=n('us','goal',e=>e.player===p.id),s=g+n('us','miss',e=>e.player===p.id)+n('us','saved',e=>e.player===p.id),tf=n('us','tf',e=>e.player===p.id);
+    return{p,g,s,tf};
+  }).filter(r=>r.s||r.tf).sort((a,b)=>b.g-a.g||b.s-a.s);
+  const gks=S.players.map(p=>{const sv=n('them','save',e=>e.gk===p.id),in_=n('them','goal',e=>e.gk===p.id);return{p,sv,in_}}).filter(r=>r.sv+r.in_);
+  /* skyttar per motståndare */
+  const oppShooters=[...new Set(S.events.filter(e=>e.side==='them'&&(e.type==='goal'||e.type==='save')&&e.num).map(e=>e.num))].map(u=>{
+    const g=n('them','goal',e=>e.num===u),sv=n('them','save',e=>e.num===u);return{u,g,s:g+sv};
+  }).sort((a,b)=>b.g-a.g||b.s-a.s);
+  let pts=[],pl_=[];
+  if(mapTeam==='them'){
+    if(mapF!=='save')pts=pts.concat(ev('them','goal',e=>e.x!=null&&(!mapP||e.num===mapP)).map(e=>({x:e.x,y:e.y,c:'#eb5757'})));
+    if(mapF!=='goal')pts=pts.concat(ev('them','save',e=>e.x!=null&&(!mapP||e.num===mapP)).map(e=>({x:e.x,y:e.y,c:'#27ae60'})));
+    pl_=[...new Set(S.events.filter(e=>e.side==='them'&&e.x!=null&&e.num).map(e=>e.num))].sort((a,b)=>a-b).map(u=>[u,oppLabel(u)]);
+  }else{
+    pts=ev('us','goal',e=>e.x!=null&&(!mapP||e.player===mapP)).map(e=>({x:e.x,y:e.y,c:'#ffd43b'}));
+    pl_=[...new Set(ev('us','goal',e=>e.x!=null).map(e=>e.player).filter(Boolean))].map(id=>[id,plName(id)]).sort((a,b)=>(+(pl(a[0])||{}).num)-(+(pl(b[0])||{}).num));
+  }
+  $('stats').innerHTML=`
+  <div class="card"><h3>Snabböversikt ${S.done?'':'<span class="live">pågår</span>'}</h3><table class="big"><tr><th></th><th class="cus">${esc(S.team)}</th><th class="cthem">${esc(S.opp)}</th></tr>
+  ${rows.map(r=>`<tr><td>${r[0]}</td><td class="cus">${r[1]}</td><td class="cthem">${r[2]}</td></tr>`).join('')}</table>
+  <p class="sub">${fmtDate(S.date)} · Halvlek 1: ${h(1)} · Halvlek 2: ${h(2)}</p></div>
+  <div class="card"><h3>Topp 5 målskyttar</h3><div class="two"><div><div class="sub cus" style="margin-top:0">${esc(S.team)}</div>${topList(top5('us'))}</div><div><div class="sub cthem" style="margin-top:0">${esc(S.opp)}</div>${topList(top5('them'))}</div></div></div>
+  <div class="card"><h3>Våra spelare</h3>${ps.length?`<table><tr><th>Spelare</th><th>Mål</th><th>Skott</th><th>Eff.</th><th>TF</th></tr>${ps.map(r=>`<tr><td>#${esc(r.p.num)} ${esc(r.p.name)}</td><td><b>${r.g}</b></td><td>${r.s}</td><td>${pct(r.g,r.s)}</td><td>${r.tf}</td></tr>`).join('')}</table>`:'<p class="empty">Inget registrerat än</p>'}</div>
+  <div class="card"><h3>Våra målvakter</h3>${gks.length?`<table><tr><th>Målvakt</th><th>Räddn.</th><th>Insl.</th><th>Rädd.%</th></tr>${gks.map(r=>`<tr><td>#${esc(r.p.num)} ${esc(r.p.name)}</td><td><b>${r.sv}</b></td><td>${r.in_}</td><td>${pct(r.sv,r.sv+r.in_)}</td></tr>`).join('')}</table>`:'<p class="empty">Inget registrerat än</p>'}</div>
+  <div class="card wide"><h3>Motståndarnas skyttar</h3>${oppShooters.length?`<table><tr><th>Spelare</th><th>Mål</th><th>Skott på mål</th><th>Eff.</th></tr>${oppShooters.map(r=>`<tr><td>${esc(oppLabel(r.u))}</td><td><b>${r.g}</b></td><td>${r.s}</td><td>${pct(r.g,r.s)}</td></tr>`).join('')}</table><p class="note">Skott på mål = mål + räddningar. Skott utanför registreras per lag.</p>`:'<p class="empty">Inget registrerat än</p>'}</div>
+  <div class="card wide"><h3>Målbild</h3>
+  <div class="filters">${[['them',S.opp+' – avslut'],['us',S.team+' – mål']].map(([k,l])=>`<button data-team="${k}" class="${mapTeam===k?'on':''}">${esc(l)}</button>`).join('')}</div>
+  ${mapTeam==='them'?`<div class="filters">${[['all','Mål + räddningar'],['goal','Insläppta mål'],['save','Våra räddningar']].map(([k,l])=>`<button data-f="${k}" class="${mapF===k?'on':''}">${l}</button>`).join('')}</div>`:''}
+  <div class="filters"><button data-p="" class="${!mapP?'on':''}">Alla spelare</button>${pl_.map(([k,l])=>`<button data-p="${esc(k)}" class="${mapP===k?'on':''}">${esc(l)}</button>`).join('')}</div>
+  ${goalSVG(pts,zonesOf(pts))}
+  <div class="legend">${mapTeam==='them'?`<span><i class="dot" style="background:#eb5757"></i>Insläppt mål</span><span><i class="dot" style="background:#27ae60"></i>Vår räddning</span>`:'<span><i class="dot" style="background:#ffd43b"></i>Vårt mål</span>'}<span>${pts.length} st · siffror = antal per zon</span></div></div>
+  <div class="card wide"><div class="row" style="margin:0;justify-content:space-between">
+    <button class="hbtn stop" id="st-del">🗑 Radera matchen</button>
+    <button class="hbtn" id="st-exp">📤 Dela matchen</button>
+    ${S.done?'<button class="hbtn" id="st-reopen">✏️ Öppna matchläge för att rätta</button>':'<button class="hbtn go" id="st-match">Tillbaka till matchläge</button>'}
+  </div></div>`;
+  $('stats').querySelectorAll('[data-team]').forEach(b=>b.onclick=()=>{mapTeam=b.dataset.team;mapP='';mapF='all';renderStats()});
+  $('stats').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{mapF=b.dataset.f;renderStats()});
+  $('stats').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{mapP=b.dataset.p;renderStats()});
+  $('st-del').onclick=()=>ask('Radera matchen mot '+S.opp+' ('+fmtDate(S.date)+')? Det går inte att ångra.','Radera',()=>{DB.matches=DB.matches.filter(m=>m!==S);S=null;save();show('home')});
+  $('st-exp').onclick=()=>exportData({teams:DB.teams.filter(t=>t.id===S.teamId),matches:[S]},'guif-match-'+S.date+'-'+S.opp.replace(/[^a-zA-Z0-9åäöÅÄÖ]+/g,'-'));
+  if($('st-reopen'))$('st-reopen').onclick=()=>{S.done=false;save();show('match')};
+  if($('st-match'))$('st-match').onclick=()=>show('match');
+}
+$('b-back').onclick=()=>show(S&&!S.done?'match':'home');
+function summary(){
+  const L=[`${S.team} – ${S.opp}  ${scoreOf(S)}  (${fmtDate(S.date)})`,'',
+  `Tekniska fel: ${n('us','tf')} – ${n('them','tf')}`,`Räddningar: ${n('them','save')} – ${n('us','saved')}`,`Skott utanför: ${n('us','miss')} – ${n('them','miss')}`,'',
+  `Målskyttar ${S.team}: `+top5('us').map(([a,b])=>a+' '+b).join(', '),`Målskyttar ${S.opp}: `+top5('them').map(([a,b])=>a+' '+b).join(', ')];
+  return L.join('\n');
+}
+$('b-copy').onclick=async()=>{
+  const t=summary();
+  try{await navigator.clipboard.writeText(t);const bc=$('b-copy'),old=bc.innerHTML;bc.textContent='✓ Kopierat';setTimeout(()=>bc.innerHTML=old,1500)}
+  catch(e){open(`<h3>Sammanfattning</h3><textarea readonly style="min-height:200px">${esc(t)}</textarea><div class="row"><button class="hbtn" id="c-x">Stäng</button></div>`);$('c-x').onclick=close}
+};
+
+/* =========================================================
+   SPELARSTATISTIK (alla matcher)
+   ========================================================= */
+let seasonTeam=null,curPid=null;
+function seasonOf(t){
+  const ms=DB.matches.filter(m=>m.teamId===t.id);
+  return t.players.map(p=>{
+    const r={p,m:0,g:0,s:0,tf:0,sv:0,in_:0};
+    ms.forEach(m=>{
+      let any=false;
+      m.events.forEach(e=>{
+        if(e.side==='us'&&e.player===p.id){any=true;if(e.type==='goal'){r.g++;r.s++}else if(e.type==='miss'||e.type==='saved')r.s++;else if(e.type==='tf')r.tf++}
+        if(e.side==='them'&&e.gk===p.id){any=true;if(e.type==='save')r.sv++;else if(e.type==='goal')r.in_++}
+      });
+      if(any)r.m++;
+    });
+    return r;
+  });
+}
+function renderPlayers(){
+  const own=ownTeams();
+  const t=team(seasonTeam)||own[0];
+  if(!t){$('players').innerHTML='<p class="empty">Lägg till ett eget lag först.</p>';return}
+  seasonTeam=t.id;
+  const ms=DB.matches.filter(m=>m.teamId===t.id);
+  const rows=seasonOf(t);
+  const field=rows.filter(r=>!r.p.gk).sort((a,b)=>b.g-a.g||b.s-a.s||(+a.p.num-+b.p.num));
+  const keepers=rows.filter(r=>r.p.gk).sort((a,b)=>b.sv-a.sv);
+  const W=ms.filter(m=>goalsOf(m,'us')>goalsOf(m,'them')).length,D=ms.filter(m=>goalsOf(m,'us')===goalsOf(m,'them')).length,L=ms.length-W-D;
+  $('players').innerHTML=`
+  ${own.length>1?`<div class="filters">${own.map(o=>`<button data-st="${o.id}" class="${o.id===t.id?'on':''}">${esc(o.name)}</button>`).join('')}</div>`:''}
+  <div class="kpis"><div><b>${ms.length}</b><span>matcher</span></div><div><b>${W}-${D}-${L}</b><span>V-O-F</span></div><div><b>${ms.reduce((a,m)=>a+goalsOf(m,'us'),0)}</b><span>gjorda mål</span></div><div><b>${ms.reduce((a,m)=>a+goalsOf(m,'them'),0)}</b><span>insläppta</span></div></div>
+  <div class="card"><h3>Utespelare – tryck på en spelare</h3><table class="click"><tr><th>Spelare</th><th>M</th><th>Mål</th><th>Skott</th><th>Eff.</th><th>TF</th><th>Mål/m</th></tr>
+  ${field.map(r=>`<tr data-pid="${r.p.id}"><td>#${esc(r.p.num)} ${esc(r.p.name)}</td><td>${r.m}</td><td><b>${r.g}</b></td><td>${r.s}</td><td>${pct(r.g,r.s)}</td><td>${r.tf}</td><td>${r.m?(r.g/r.m).toFixed(1):'–'}</td></tr>`).join('')}</table>
+  <p class="note">M = matcher där spelaren har något registrerat.</p></div>
+  <div class="card"><h3>Målvakter</h3><table class="click"><tr><th>Målvakt</th><th>M</th><th>Räddn.</th><th>Insl.</th><th>Rädd.%</th></tr>
+  ${keepers.map(r=>`<tr data-pid="${r.p.id}"><td>#${esc(r.p.num)} ${esc(r.p.name)}</td><td>${r.m}</td><td><b>${r.sv}</b></td><td>${r.in_}</td><td>${pct(r.sv,r.sv+r.in_)}</td></tr>`).join('')}</table></div>`;
+  $('players').querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{seasonTeam=b.dataset.st;renderPlayers()});
+  $('players').querySelectorAll('[data-pid]').forEach(r=>r.onclick=()=>{curPid=r.dataset.pid;show('player')});
+}
+$('ps-back').onclick=()=>show('home');
+$('p-back').onclick=()=>show('players');
+
+let pMap='all';
+function renderPlayer(){
+  const t=team(seasonTeam),p=t&&t.players.find(x=>x.id===curPid);
+  if(!p){show('players');return}
+  $('p-title').textContent='#'+p.num+' '+p.name+(p.gk?' · Målvakt':'');
+  const ms=DB.matches.filter(m=>m.teamId===t.id).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.created-b.created);
+  const r=seasonOf(t).find(x=>x.p.id===p.id);
+  const per=ms.map(m=>{
+    const E=m.events;
+    const g=E.filter(e=>e.side==='us'&&e.player===p.id&&e.type==='goal').length,
+          s=E.filter(e=>e.side==='us'&&e.player===p.id&&e.type!=='tf').length,
+          tf=E.filter(e=>e.side==='us'&&e.player===p.id&&e.type==='tf').length,
+          sv=E.filter(e=>e.side==='them'&&e.gk===p.id&&e.type==='save').length,
+          in_=E.filter(e=>e.side==='them'&&e.gk===p.id&&e.type==='goal').length;
+    return{m,g,s,tf,sv,in_};
+  }).filter(x=>x.s||x.tf||x.sv||x.in_);
+  const isGk=p.gk||r.sv+r.in_>0;
+  let pts=[];
+  ms.forEach(m=>m.events.forEach(e=>{
+    if(e.x==null)return;
+    if(e.side==='us'&&e.type==='goal'&&e.player===p.id&&(pMap==='all'||pMap==='own'))pts.push({x:e.x,y:e.y,c:'#ffd43b'});
+    if(e.side==='them'&&e.gk===p.id){
+      if(e.type==='goal'&&pMap!=='save'&&pMap!=='own')pts.push({x:e.x,y:e.y,c:'#eb5757'});
+      if(e.type==='save'&&pMap!=='goal'&&pMap!=='own')pts.push({x:e.x,y:e.y,c:'#27ae60'});
+    }
+  }));
+  $('player').innerHTML=`
+  <div class="kpis">${isGk?`<div><b>${r.sv}</b><span>räddningar</span></div><div><b>${r.in_}</b><span>insläppta</span></div><div><b>${pct(r.sv,r.sv+r.in_)}</b><span>räddningsprocent</span></div>`:''}
+  ${!p.gk||r.s?`<div><b>${r.g}</b><span>mål</span></div><div><b>${r.s}</b><span>skott</span></div><div><b>${pct(r.g,r.s)}</b><span>effektivitet</span></div><div><b>${r.tf}</b><span>tekniska fel</span></div>`:''}
+  <div><b>${r.m}</b><span>matcher</span></div></div>
+  <div class="card"><h3>Match för match</h3>${per.length?`<table class="click"><tr><th>Match</th>${isGk?'<th>Räddn.</th><th>Insl.</th><th>%</th>':''}${!p.gk?'<th>Mål</th><th>Skott</th><th>TF</th>':''}</tr>
+  ${per.map(x=>`<tr data-mid="${x.m.id}"><td>${esc(x.m.opp)}<br><small class="mut">${fmtDate(x.m.date)} · ${scoreOf(x.m)}</small></td>${isGk?`<td><b>${x.sv}</b></td><td>${x.in_}</td><td>${pct(x.sv,x.sv+x.in_)}</td>`:''}${!p.gk?`<td><b>${x.g}</b></td><td>${x.s}</td><td>${x.tf}</td>`:''}</tr>`).join('')}</table>`:'<p class="empty">Inget registrerat än.</p>'}</div>
+  <div class="card"><h3>Målbild – alla matcher</h3>
+  ${isGk?`<div class="filters">${[['all','Allt'],['goal','Insläppta'],['save','Räddningar']].map(([k,l])=>`<button data-pm="${k}" class="${pMap===k?'on':''}">${l}</button>`).join('')}</div>`:''}
+  ${goalSVG(pts,zonesOf(pts))}
+  <div class="legend">${isGk?'<span><i class="dot" style="background:#eb5757"></i>Insläppt</span><span><i class="dot" style="background:#27ae60"></i>Räddning</span>':''}${!p.gk?'<span><i class="dot" style="background:#ffd43b"></i>Mål</span>':''}<span>${pts.length} st</span></div></div>`;
+  $('player').querySelectorAll('[data-pm]').forEach(b=>b.onclick=()=>{pMap=b.dataset.pm;renderPlayer()});
+  $('player').querySelectorAll('[data-mid]').forEach(rw=>rw.onclick=()=>{S=DB.matches.find(m=>m.id===rw.dataset.mid);resetMap();show('stats')});
+}
+
+/* =========================================================
+   EXPORT / IMPORT
+   ========================================================= */
+async function exportData(db,base){
+  const data=JSON.stringify({app:'guif-stat',v:1,exported:new Date().toISOString(),db},null,1);
+  const name=base+'.json';
+  const file=new File([data],name,{type:'application/json'});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}
+  catch(e){if(e&&e.name==='AbortError')return}
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500)}
+  catch(e){open(`<h3>Kunde inte spara filen</h3><p class="note">Exporten fungerar i den installerade appen men inte i förhandsvisningen.</p><div class="row"><button class="hbtn" id="x-c">Stäng</button></div>`);$('x-c').onclick=close}
+}
+function importFile(f){
+  const r=new FileReader();
+  r.onload=()=>{
+    let o;try{o=JSON.parse(r.result)}catch(e){o=null}
+    const db=o&&(o.db||o);
+    if(!db||!Array.isArray(db.matches)){open(`<h3>Fel filformat</h3><p class="note">Filen kommer inte från Guif Matchstatistik.</p><div class="row"><button class="hbtn" id="x-c">Stäng</button></div>`);$('x-c').onclick=close;return}
+    let nt=0,nm=0,um=0;const map={};
+    (db.teams||[]).forEach(t=>{
+      const same=DB.teams.find(x=>x.id===t.id)||DB.teams.find(x=>x.name===t.name&&x.type===t.type);
+      if(same){map[t.id]=same.id;if(t.type==='opp'&&!same.players.length&&t.players.length)same.players=t.players}
+      else{DB.teams.push(t);map[t.id]=t.id;nt++}
+    });
+    db.matches.forEach(m=>{
+      m={...m,teamId:map[m.teamId]||m.teamId};
+      if(m.importId&&DB.matches.some(x=>x.importId===m.importId))return;
+      const i=DB.matches.findIndex(x=>x.id===m.id);
+      if(i<0){DB.matches.push(m);nm++}
+      else if((m.events||[]).length>DB.matches[i].events.length||(m.done&&!DB.matches[i].done)){DB.matches[i]=m;um++}
+    });
+    save();renderHome();
+    open(`<h3>Import klar</h3><p>${nm} nya matcher, ${um} uppdaterade, ${nt} nya lag.</p><div class="row"><button class="hbtn go" id="x-c">OK</button></div>`);$('x-c').onclick=close;
+  };
+  r.readAsText(f);
+}
+
+/* offline-stöd när appen körs från en riktig webbadress */
+if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+
+save();
+show('home');
+</script>
+</body>
+</html>
