@@ -173,6 +173,10 @@ table.tbl tr.me td{color:#ff4d55;font-weight:700}
 .pill.ok{background:#1e4d32;color:#6fe39b}.pill.off{background:#4d3f12;color:#ffd96a}
 .err{color:#ff6b6b;font-size:14px;min-height:0;margin:8px 0 0}
 .code{letter-spacing:2px;font-size:17px;color:var(--txt)}
+.tfgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tfbtn{background:#33465a;font-size:20px;font-weight:700;padding:20px 10px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.tfbtn span{font-size:28px}.tfbtn.small{grid-column:1/-1;padding:12px;flex-direction:row;justify-content:center;font-size:17px;background:#26262c}.tfbtn.small span{font-size:20px}
+.tfbtn:active{filter:brightness(1.3)}
 small.mut{color:var(--mut);font-size:12px}
 @media (max-width:700px){.hgrid{grid-template-columns:1fr}.bigbtn{padding:18px}.page{padding:10px;gap:10px}.kpis b{font-size:22px}}
 </style>
@@ -520,8 +524,8 @@ $('n-start').onclick=()=>{
    ========================================================= */
 function describe(e){
   const t=fmt(e.t)+' ';
-  if(e.side==='us')return t+{goal:'⚽ Mål ',miss:'↗ Utanför ',saved:'✋ Räddad ',tf:'⚠ TF '}[e.type]+(e.player?plName(e.player):'');
-  return t+{goal:'⚽ Mål '+oppLabel(e.num),miss:'↗ Utanför',save:'🧤 Räddning'+(e.num!==undefined?' mot '+oppLabel(e.num):''),tf:'⚠ TF'}[e.type];
+  if(e.side==='us')return t+{goal:'⚽ Mål ',miss:'↗ Utanför ',saved:'✋ Räddad ',tf:'⚠ '+(tfName(e.tf)||'TF')+' '}[e.type]+(e.player?plName(e.player):'');
+  return t+{goal:'⚽ Mål '+oppLabel(e.num),miss:'↗ Utanför',save:'🧤 Räddning'+(e.num!==undefined?' mot '+oppLabel(e.num):''),tf:'⚠ '+(tfName(e.tf)||'TF')}[e.type];
 }
 function renderMatch(){
   $('h-us').textContent=S.team;$('h-them').textContent=S.opp;$('s-us').textContent=S.team;$('s-them').textContent=S.opp;
@@ -550,8 +554,25 @@ $('b-gk').onclick=()=>pickPlayer('Vem står i mål?',true,p=>{S.gk=p;save();clos
 
 function add(e){S.events.push(e);save();close();renderMatch()}
 document.querySelectorAll('.ev').forEach(b=>b.onclick=()=>register(b.dataset.side,b.dataset.type));
+const TF_TYPES=[['pass','Felpass','🎯'],['steg','Stegfel','👣'],['foul','Offensiv foul','💥'],['tapp','Tappad boll','🏐'],['annat','Annat','❔']];
+const tfName=k=>(TF_TYPES.find(t=>t[0]===k)||[,''])[1];
+function pickTf(title,cb){
+  open(`<h3>${esc(title)}</h3><div class="tfgrid">${TF_TYPES.map(([k,l,i])=>`<button class="tfbtn${k==='annat'?' small':''}" data-tf="${k}"><span>${i}</span>${l}</button>`).join('')}</div>
+  <div class="row"><button class="hbtn" id="tf-x">Avbryt</button></div>`);
+  $('sheet').querySelectorAll('[data-tf]').forEach(b=>b.onclick=()=>cb(b.dataset.tf));
+  $('tf-x').onclick=close;
+}
+function tfBreakdown(evs){const c={};evs.forEach(e=>{const k=e.tf||'';c[k]=(c[k]||0)+1});return c}
+function tfText(evs){const c=tfBreakdown(evs);return TF_TYPES.filter(t=>c[t[0]]).map(t=>t[1]+' '+c[t[0]]).concat(c['']?['Ej angivet '+c['']]:[]).join(', ')}
 function register(side,type){
   const base={id:uid(),side,type,t:secs(),half:S.half,at:Date.now()};
+  if(type==='tf'){
+    pickTf(side==='us'?'Vårt tekniska fel – vilket?':'Motståndarnas tekniska fel – vilket?',tf=>{
+      if(side==='us')pickPlayer(tfName(tf)+' – vem?',false,p=>add({...base,player:p,tf}),true);
+      else add({...base,tf});
+    });
+    return;
+  }
   if(side==='us'){
     const title={goal:'Mål – vem gjorde det?',miss:'Skott utanför – vem sköt?',saved:'Deras målvakt räddade – vem sköt?',tf:'Tekniskt fel – vem?'}[type];
     pickPlayer(title,false,p=>{
@@ -674,6 +695,12 @@ function renderStats(){
   <p class="sub">${fmtDate(S.date)} · Halvlek 1: ${h(1)} · Halvlek 2: ${h(2)}</p></div>
   <div class="card"><h3>Topp 5 målskyttar</h3><div class="two"><div><div class="sub cus" style="margin-top:0">${esc(S.team)}</div>${topList(top5('us'))}</div><div><div class="sub cthem" style="margin-top:0">${esc(S.opp)}</div>${topList(top5('them'))}</div></div></div>
   <div class="card"><h3>Våra spelare</h3>${ps.length?`<table><tr><th>Spelare</th><th>Mål</th><th>Skott</th><th>Eff.</th><th>TF</th></tr>${ps.map(r=>`<tr><td>#${esc(r.p.num)} ${esc(r.p.name)}</td><td><b>${r.g}</b></td><td>${r.s}</td><td>${pct(r.g,r.s)}</td><td>${r.tf}</td></tr>`).join('')}</table>`:'<p class="empty">Inget registrerat än</p>'}</div>
+  <div class="card"><h3>Tekniska fel per typ</h3>${(()=>{const u=tfBreakdown(ev('us','tf')),t=tfBreakdown(ev('them','tf'));
+    const rows=TF_TYPES.map(x=>[x[2]+' '+x[1],u[x[0]]||0,t[x[0]]||0]).concat((u['']||t[''])?[['Ej angivet',u['']||0,t['']||0]]:[]).filter(r=>r[1]||r[2]);
+    if(!rows.length)return '<p class="empty">Inga tekniska fel än</p>';
+    const ourBy=S.players.map(p=>[p,ev('us','tf',e=>e.player===p.id)]).filter(x=>x[1].length).sort((a,b)=>b[1].length-a[1].length);
+    return `<table><tr><th></th><th class="cus">${esc(S.team)}</th><th class="cthem">${esc(S.opp)}</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td class="cus"><b>${r[1]}</b></td><td class="cthem"><b>${r[2]}</b></td></tr>`).join('')}</table>
+    ${ourBy.length?`<div class="sub">Per spelare</div><table>${ourBy.map(([p,es])=>`<tr><td>#${esc(p.num)} ${esc(p.name)}</td><td style="text-align:right;color:var(--mut);font-size:13px">${esc(tfText(es))}</td><td><b>${es.length}</b></td></tr>`).join('')}</table>`:''}`})()}</div>
   <div class="card"><h3>Våra målvakter</h3>${gks.length?`<table><tr><th>Målvakt</th><th>Räddn.</th><th>Insl.</th><th>Rädd.%</th></tr>${gks.map(r=>`<tr><td>#${esc(r.p.num)} ${esc(r.p.name)}</td><td><b>${r.sv}</b></td><td>${r.in_}</td><td>${pct(r.sv,r.sv+r.in_)}</td></tr>`).join('')}</table>`:'<p class="empty">Inget registrerat än</p>'}</div>
   <div class="card wide"><h3>Motståndarnas skyttar</h3>${oppShooters.length?`<table><tr><th>Spelare</th><th>Mål</th><th>Skott på mål</th><th>Eff.</th></tr>${oppShooters.map(r=>`<tr><td>${esc(oppLabel(r.u))}</td><td><b>${r.g}</b></td><td>${r.s}</td><td>${pct(r.g,r.s)}</td></tr>`).join('')}</table><p class="note">Skott på mål = mål + räddningar. Skott utanför registreras per lag.</p>`:'<p class="empty">Inget registrerat än</p>'}</div>
   <div class="card wide"><h3>Målbild</h3>
@@ -698,7 +725,7 @@ function renderStats(){
 $('b-back').onclick=()=>show(S&&!S.done?'match':'home');
 function summary(){
   const L=[`${S.team} – ${S.opp}  ${scoreOf(S)}  (${fmtDate(S.date)})`,'',
-  `Tekniska fel: ${n('us','tf')} – ${n('them','tf')}`,`Räddningar: ${n('them','save')} – ${n('us','saved')}`,`Skott utanför: ${n('us','miss')} – ${n('them','miss')}`,'',
+  `Tekniska fel: ${n('us','tf')} – ${n('them','tf')}`+(n('us','tf')?` (vi: ${tfText(ev('us','tf'))})`:''),`Räddningar: ${n('them','save')} – ${n('us','saved')}`,`Skott utanför: ${n('us','miss')} – ${n('them','miss')}`,'',
   `Målskyttar ${S.team}: `+top5('us').map(([a,b])=>a+' '+b).join(', '),`Målskyttar ${S.opp}: `+top5('them').map(([a,b])=>a+' '+b).join(', ')];
   return L.join('\n');
 }
@@ -781,6 +808,8 @@ function renderPlayer(){
   <div class="kpis">${isGk?`<div><b>${r.sv}</b><span>räddningar</span></div><div><b>${r.in_}</b><span>insläppta</span></div><div><b>${pct(r.sv,r.sv+r.in_)}</b><span>räddningsprocent</span></div>`:''}
   ${!p.gk||r.s?`<div><b>${r.g}</b><span>mål</span></div><div><b>${r.s}</b><span>skott</span></div><div><b>${pct(r.g,r.s)}</b><span>effektivitet</span></div><div><b>${r.tf}</b><span>tekniska fel</span></div>`:''}
   <div><b>${r.m}</b><span>matcher</span></div></div>
+  ${(()=>{const all=[];ms.forEach(m=>m.events.forEach(e=>{if(e.side==='us'&&e.type==='tf'&&e.player===p.id)all.push(e)}));
+    return all.length?`<div class="card"><h3>Tekniska fel – alla matcher</h3><p style="margin:0;font-size:17px">${esc(tfText(all))}</p></div>`:''})()}
   <div class="card"><h3>Match för match</h3>${per.length?`<table class="click"><tr><th>Match</th>${isGk?'<th>Räddn.</th><th>Insl.</th><th>%</th>':''}${!p.gk?'<th>Mål</th><th>Skott</th><th>TF</th>':''}</tr>
   ${per.map(x=>`<tr data-mid="${x.m.id}"><td>${esc(x.m.opp)}<br><small class="mut">${fmtDate(x.m.date)} · ${scoreOf(x.m)}</small></td>${isGk?`<td><b>${x.sv}</b></td><td>${x.in_}</td><td>${pct(x.sv,x.sv+x.in_)}</td>`:''}${!p.gk?`<td><b>${x.g}</b></td><td>${x.s}</td><td>${x.tf}</td>`:''}</tr>`).join('')}</table>`:'<p class="empty">Inget registrerat än.</p>'}</div>
   <div class="card"><h3>Målbild – alla matcher</h3>
