@@ -969,7 +969,7 @@ function errText(e){
   const c=(e&&e.code)||'';
   return({'auth/invalid-credential':'Fel e-post eller lösenord.','auth/wrong-password':'Fel e-post eller lösenord.','auth/user-not-found':'Det finns inget konto med den e-postadressen.',
     'auth/email-already-in-use':'Det finns redan ett konto med den e-postadressen. Logga in i stället.','auth/weak-password':'Lösenordet måste vara minst 6 tecken.',
-    'auth/invalid-email':'E-postadressen ser inte rätt ut.','auth/network-request-failed':'Ingen internetanslutning.','auth/too-many-requests':'För många försök. Vänta en stund och försök igen.',
+    'auth/invalid-email':'E-postadressen ser inte rätt ut.','auth/network-request-failed':'Ingen internetanslutning.','auth/admin-restricted-operation':'Anonym inloggning är inte påslagen i Firebase.','auth/operation-not-allowed':'Anonym inloggning är inte påslagen i Firebase.','auth/too-many-requests':'För många försök. Vänta en stund och försök igen.',
     'permission-denied':'Saknar behörighet. Har säkerhetsreglerna publicerats i Firebase?','unavailable':'Ingen kontakt med molnet just nu.'})[c]||('Något gick fel'+(c?' ('+c+')':'')+'.');
 }
 
@@ -983,7 +983,9 @@ function loadFirebase(){
     F={auth:U.getAuth(app),db,U,Fs};fbState='ready';
     U.onAuthStateChanged(F.auth,u=>{
       authKnown=true;user=u;
-      if(u&&CLOUD.space)startSync();else stopSync();
+      if(u&&CLOUD.space)connectSpace();
+      else if(!u&&CLOUD.space)U.signInAnonymously(F.auth).catch(e=>{cloudErr=errText(e);refreshCloudUI()});
+      else stopSync();
       refreshCloudUI();
     });
     return F;
@@ -1082,83 +1084,83 @@ function updateDot(){
 window.addEventListener('online',()=>{updateDot();if(curView==='home')refreshCloudUI()});
 window.addEventListener('offline',()=>{updateDot();if(curView==='home')refreshCloudUI()});
 
+/* ---- anslutning med lagkod (anonym inloggning i bakgrunden) ---- */
+async function ensureUser(){await loadFirebase();if(!F.auth.currentUser)await F.U.signInAnonymously(F.auth);user=F.auth.currentUser;return user}
+async function connectSpace(){
+  /* se till att enheten är medlem (t.ex. efter att appen installerats om) och starta synken */
+  try{
+    const Fs=F.Fs,ref=Fs.doc(F.db,'spaces',CLOUD.space),snap=await Fs.getDoc(ref);
+    if(snap.exists()&&!(snap.data().members||[]).includes(user.uid))await Fs.updateDoc(ref,{members:Fs.arrayUnion(user.uid)});
+  }catch(e){/* offline: kör på det som finns sparat */}
+  startSync();refreshCloudUI();
+}
+
 /* ---- kortet på startskärmen ---- */
 function cloudCard(){
-  const st=!navigator.onLine?'<span class="pill off">Offline – synkar när nätet är tillbaka</span>':'<span class="pill ok">Online</span>';
+  const st=!navigator.onLine?'<span class="pill off">Offline – sparas på servern när nätet är tillbaka</span>':'<span class="pill ok">Sparas på servern</span>';
   let body;
-  if(CLOUD.space&&(fbState==='loading'||(fbState==='ready'&&!authKnown)))body=`<p class="note">Ansluter till molnet…</p>`;
-  else if(!user)body=`<p class="note" style="margin-top:0">Logga in för att synka matcher och statistik mellan iPad, telefon och andra tränare. Allt fungerar även utan internet och synkas när nätet kommer tillbaka.</p>
-    <div class="row" style="justify-content:flex-start"><button class="hbtn go" id="c-login">Logga in eller skapa konto</button></div>`;
-  else if(!CLOUD.space)body=`<p class="note" style="margin-top:0">Inloggad som <b>${esc(user.email)}</b>. Välj lagutrymme för att börja synka.</p>
-    <div class="row" style="justify-content:flex-start"><button class="hbtn go" id="c-space">Välj lagutrymme</button><button class="hbtn" id="c-out">Logga ut</button></div>`;
-  else body=`<p style="margin:0 0 8px">${st}</p><p class="note" style="margin-top:0">Inloggad som <b>${esc(user.email)}</b>.<br>Lagkod: <b class="code">${esc(CLOUD.space)}</b>. Ge den till tränare som ska synka med dig.</p>
-    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="c-share">Dela lagkoden</button><button class="hbtn" id="c-out">Logga ut</button></div>`;
-  return `<div class="card"><h3>☁️ Molnsynk</h3>${body}${cloudErr?`<p class="err">${esc(cloudErr)}</p>`:''}</div>`;
+  if(CLOUD.space&&(fbState!=='error')&&(!authKnown||!user))body=`<p class="note" style="margin-top:0">Ansluter till servern…</p>`;
+  else if(!CLOUD.space)body=`<p class="note" style="margin-top:0">Just nu sparas allt bara på den här enheten. Koppla appen till lagets utrymme på servern, så sparas allt där och syns på alla enheter. Det fungerar även utan internet i hallen och synkas när nätet kommer tillbaka.</p>
+    <div class="row" style="justify-content:flex-start">
+      <button class="hbtn go" id="c-join">Gå med med lagkod</button>
+      <button class="hbtn" id="c-start">Starta nytt lagutrymme</button></div>`;
+  else body=`<p style="margin:0 0 10px">${st}</p>
+    <p class="note" style="margin-top:0">Lagkod: <b class="code">${esc(CLOUD.space)}</b><br>Skriv in koden på andra enheter och hos andra tränare så ser ni samma data.</p>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="c-share">Dela lagkoden</button><button class="hbtn" id="c-leave">Koppla från</button></div>`;
+  return `<div class="card"><h3>☁️ Spara på servern</h3>${body}${cloudErr?`<p class="err">${esc(cloudErr)}</p>`:''}</div>`;
 }
 function bindCloudCard(){
-  if($('c-login'))$('c-login').onclick=cloudLogin;
-  if($('c-space'))$('c-space').onclick=chooseSpace;
-  if($('c-out'))$('c-out').onclick=()=>ask('Logga ut? Det som finns på enheten ligger kvar men slutar synkas.','Logga ut',async()=>{stopSync();CLOUD.space=null;CLOUD.last={};saveCloudState();try{await F.U.signOut(F.auth)}catch(e){}user=null;renderHome()});
+  if($('c-start'))$('c-start').onclick=startSpace;
+  if($('c-join'))$('c-join').onclick=joinPrompt;
+  if($('c-leave'))$('c-leave').onclick=()=>ask('Koppla från lagutrymmet? Det som finns på enheten ligger kvar men slutar sparas på servern. Det som redan finns på servern påverkas inte.','Koppla från',()=>{stopSync();CLOUD.space=null;CLOUD.last={};saveCloudState();renderHome()});
   if($('c-share'))$('c-share').onclick=async()=>{
-    const t=`Gå med i Guif Matchstatistik: öppna https://dickfors.github.io/guif-stat/ , logga in och ange lagkoden ${CLOUD.space}`;
+    const t=`Guif Matchstatistik: öppna https://dickfors.github.io/guif-stat/ i Safari, lägg till på hemskärmen och skriv lagkoden ${CLOUD.space} under "Spara på servern".`;
     try{if(navigator.share){await navigator.share({text:t});return}}catch(e){if(e&&e.name==='AbortError')return}
-    try{await navigator.clipboard.writeText(t);$('c-share').textContent='✓ Kopierat'}catch(e){open(`<h3>Lagkod</h3><p style="font-size:28px;font-weight:800;letter-spacing:2px">${esc(CLOUD.space)}</p><div class="row"><button class="hbtn" id="x-c">Stäng</button></div>`);$('x-c').onclick=close}
+    try{await navigator.clipboard.writeText(t);$('c-share').textContent='✓ Kopierat'}catch(e){open(`<h3>Lagkod</h3><p style="font-size:30px;font-weight:800;letter-spacing:3px">${esc(CLOUD.space)}</p><div class="row"><button class="hbtn" id="x-c">Stäng</button></div>`);$('x-c').onclick=close}
   };
 }
-function cloudLogin(){
-  CLOUD.used=true;saveCloudState();loadFirebase().catch(()=>{});
-  open(`<h3>Logga in</h3>
-  <label for="l-mail">E-post</label><input id="l-mail" type="email" autocomplete="username" autocapitalize="off">
-  <label for="l-pass">Lösenord (minst 6 tecken)</label><input id="l-pass" type="password" autocomplete="current-password">
-  <p class="err" id="l-msg"></p>
-  <div class="row"><button class="hbtn" id="l-x">Avbryt</button><button class="hbtn" id="l-new">Skapa konto</button><button class="hbtn go" id="l-in">Logga in</button></div>
-  <p class="note"><a href="#" id="l-forgot" style="color:var(--them)">Glömt lösenordet?</a></p>`);
-  const msg=t=>{$('l-msg').textContent=t};
-  const go=async create=>{
-    const m=$('l-mail').value.trim(),p=$('l-pass').value;if(!m||!p){msg('Fyll i e-post och lösenord.');return}
-    msg('Vänta…');
-    try{await loadFirebase();
-      if(create)await F.U.createUserWithEmailAndPassword(F.auth,m,p);else await F.U.signInWithEmailAndPassword(F.auth,m,p);
-      close();if(!CLOUD.space)chooseSpace();
-    }catch(e){msg(errText(e))}
-  };
-  $('l-in').onclick=()=>go(false);$('l-new').onclick=()=>go(true);$('l-x').onclick=close;
-  $('l-forgot').onclick=async e=>{e.preventDefault();const m=$('l-mail').value.trim();if(!m){msg('Skriv din e-post först.');return}
-    try{await loadFirebase();await F.U.sendPasswordResetEmail(F.auth,m);msg('Ett mejl för att byta lösenord har skickats.')}catch(err){msg(errText(err))}};
-}
-function chooseSpace(){
-  open(`<h3>Lagutrymme</h3>
-  <p class="note" style="margin-top:0">Alla tränare som ska synka med varandra använder samma lagutrymme.</p>
-  <div class="card" style="background:#faf8f5"><b>Gå med i ett befintligt lag</b>
-    <label for="j-code">Lagkod</label><input id="j-code" autocapitalize="characters" autocomplete="off" placeholder="T.ex. K7QM2XPA">
-    <div class="row"><button class="hbtn go" id="j-go">Gå med</button></div></div>
-  <div class="card" style="background:#faf8f5;margin-top:10px"><b>Starta ett nytt lagutrymme</b>
-    <p class="note">Det som finns på den här enheten laddas upp: lag, trupp, matcher och statistik. Gör så här på den enhet där du har registrerat mest.</p>
-    <div class="row"><button class="hbtn" id="j-new">Skapa nytt lagutrymme</button></div></div>
-  <p class="err" id="j-msg"></p>
-  <div class="row"><button class="hbtn" id="j-x">Avbryt</button></div>`);
-  const msg=t=>{$('j-msg').textContent=t};
-  $('j-x').onclick=close;
-  $('j-new').onclick=async()=>{
-    msg('Skapar…');
-    try{await loadFirebase();
+function msgSheet(title,text,then){open(`<h3>${esc(title)}</h3><p>${esc(text)}</p><div class="row"><button class="hbtn" id="x-c">OK</button></div>`);$('x-c').onclick=then||close}
+function startSpace(){
+  CLOUD.used=true;saveCloudState();
+  open(`<h3>Starta nytt lagutrymme</h3>
+  <p>Allt som finns på den här enheten laddas upp till servern: lag, trupp, matcher och statistik. Du får en lagkod som du sedan skriver in på övriga enheter.</p>
+  <p class="note">Gör det här på den enhet där ni har registrerat matcher. Har någon redan startat ett lagutrymme ska du välja <b>Gå med med lagkod</b> i stället.</p>
+  <p class="err" id="s-msg"></p>
+  <div class="row"><button class="hbtn" id="s-x">Avbryt</button><button class="hbtn go" id="s-go">Starta och ladda upp</button></div>`);
+  $('s-x').onclick=close;
+  $('s-go').onclick=async()=>{
+    $('s-msg').textContent='Ansluter…';$('s-go').disabled=true;
+    try{
+      await ensureUser();
       const Fs=F.Fs,A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code='';
       const r=new Uint32Array(8);crypto.getRandomValues(r);r.forEach(x=>code+=A[x%A.length]);
       await Fs.setDoc(Fs.doc(F.db,'spaces',code),{name:(ownTeams()[0]||{}).name||'Lag',owner:user.uid,members:[user.uid],created:Date.now()});
-      CLOUD.space=code;CLOUD.last={};saveCloudState();close();startSync();renderHome();
-    }catch(e){msg(errText(e))}
+      CLOUD.space=code;CLOUD.last={};saveCloudState();startSync();
+      msgSheet('Klart!','Allt laddas nu upp till servern. Lagkoden är '+code+'. Skriv in den på övriga enheter under "Spara på servern" → "Gå med med lagkod".',()=>{close();renderHome()});
+    }catch(e){$('s-msg').textContent=errText(e);$('s-go').disabled=false}
   };
-  $('j-go').onclick=()=>{
-    const code=$('j-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length<6){msg('Skriv lagkoden.');return}
-    ask('Gå med i lag '+code+'? Det som finns på den här enheten ersätts av lagets data i molnet. Exportera först om du har registrerat något här som du vill behålla.','Gå med',async()=>{
-      try{await loadFirebase();
-        const Fs=F.Fs,ref=Fs.doc(F.db,'spaces',code),snap=await Fs.getDoc(ref);
-        if(!snap.exists()){open(`<h3>Hittar inte lagkoden</h3><p>Kontrollera koden och försök igen.</p><div class="row"><button class="hbtn" id="x-c">OK</button></div>`);$('x-c').onclick=chooseSpace;return}
-        if(!(snap.data().members||[]).includes(user.uid))await Fs.updateDoc(ref,{members:Fs.arrayUnion(user.uid)});
-        DB={teams:[],matches:[],fixtures:[],table:null,seed:DB.seed};S=null;orphans={};
-        CLOUD.space=code;CLOUD.last={};saveLocal();saveCloudState();startSync();show('home');
-      }catch(e){open(`<h3>Kunde inte gå med</h3><p>${esc(errText(e))}</p><div class="row"><button class="hbtn" id="x-c">OK</button></div>`);$('x-c').onclick=close}
-    });
+}
+function joinPrompt(){
+  CLOUD.used=true;saveCloudState();loadFirebase().catch(()=>{});
+  const hasOwn=DB.matches.some(m=>m.events.length);
+  open(`<h3>Gå med med lagkod</h3>
+  <label for="j-code">Lagkod</label><input id="j-code" autocapitalize="characters" autocomplete="off" placeholder="T.ex. K7QM2XPA" style="font-size:22px;letter-spacing:2px;text-transform:uppercase">
+  ${hasOwn?'<p class="err">Den här enheten har registrerade matcher. De ersätts av lagets data på servern. Har du inte laddat upp dem: avbryt och välj Starta nytt lagutrymme här i stället, eller exportera först.</p>':'<p class="note">Lagets data hämtas från servern till den här enheten.</p>'}
+  <p class="err" id="j-msg"></p>
+  <div class="row"><button class="hbtn" id="j-x">Avbryt</button><button class="hbtn go" id="j-go">Gå med</button></div>`);
+  $('j-x').onclick=close;
+  $('j-go').onclick=async()=>{
+    const code=$('j-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(code.length<6){$('j-msg').textContent='Skriv lagkoden.';return}
+    $('j-msg').textContent='Ansluter…';$('j-go').disabled=true;
+    try{
+      await ensureUser();
+      const Fs=F.Fs,ref=Fs.doc(F.db,'spaces',code),snap=await Fs.getDoc(ref);
+      if(!snap.exists()){$('j-msg').textContent='Hittar ingen lagkod '+code+'. Kontrollera koden.';$('j-go').disabled=false;return}
+      if(!(snap.data().members||[]).includes(user.uid))await Fs.updateDoc(ref,{members:Fs.arrayUnion(user.uid)});
+      DB={teams:[],matches:[],fixtures:[],table:null,seed:DB.seed};S=null;orphans={};
+      CLOUD.space=code;CLOUD.last={};saveLocal();saveCloudState();close();startSync();show('home');
+    }catch(e){$('j-msg').textContent=errText(e);$('j-go').disabled=false}
   };
 }
 if(CLOUD.space||CLOUD.used)loadFirebase().catch(()=>{});
