@@ -178,6 +178,22 @@ table.tbl tr.me td{color:#ff4d55;font-weight:700}
 .tfbtn{background:#33465a;font-size:20px;font-weight:700;padding:20px 10px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .tfbtn span{font-size:28px}.tfbtn.small{grid-column:1/-1;padding:12px;flex-direction:row;justify-content:center;font-size:17px;background:#26262c}.tfbtn.small span{font-size:20px}
 .tfbtn:active{filter:brightness(1.3)}
+.hgrid.one{grid-template-columns:1fr}
+.livepill{display:inline-block;background:var(--us);color:#fff;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;letter-spacing:.05em;vertical-align:middle;animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.55}}
+.item[disabled]{opacity:1;cursor:default}
+.install{background:var(--navy);color:#fff;border:0}
+.install h3{color:#d9d2c8!important}
+.install .note{color:#d9d2c8}
+.install ol{margin:6px 0 0;padding-left:20px;line-height:1.7}
+.role{display:inline-block;font-size:12px;font-weight:800;padding:3px 9px;border-radius:999px;margin-left:6px}
+.role.admin{background:var(--us-soft);color:var(--us)}.role.viewer{background:var(--them-soft);color:var(--them)}
+.codebox{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0}
+.codebox b.code{font-size:20px;letter-spacing:2px}
+.onb h2{margin:0 0 6px;font-size:24px}
+.onb .choice{display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:10px;color:var(--txt)}
+.onb .choice b{display:block;font-size:17px}.onb .choice span{color:var(--mut);font-size:14px}
+.onb .choice.main{background:var(--us);border-color:var(--us);color:#fff}.onb .choice.main span{color:#ffe0e1}
 small.mut{color:var(--mut);font-size:12px}
 @media (max-width:700px){.hgrid{grid-template-columns:1fr}.bigbtn{padding:18px}.page{padding:10px;gap:10px}.kpis b{font-size:22px}}
 
@@ -250,6 +266,14 @@ label{color:var(--mut);font-weight:700;font-size:13px}
 .code{color:var(--txt)}
 small.mut{color:var(--mut)}
 svg.goal{border-radius:12px}
+.card.install{background:var(--navy);border:0;color:#fff}
+.card.install h3{color:#d9d2c8}.card.install .note,.card.install li{color:#efe9e1}
+.hero{text-align:center;background:var(--navy)!important;color:#fff;border:0!important}
+.hero .hs{font-size:64px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05}
+.hero .ht{display:flex;justify-content:center;gap:18px;align-items:center;font-weight:700;color:#d9d2c8;font-size:15px}
+.hero .tm{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-top:6px}
+.hero .tm div{font-weight:800;font-size:16px}
+.hero .last{margin-top:10px;font-size:14px;color:#d9d2c8}
 header .cus{color:#ff8a8f} header .cthem{color:#b9cbe0}
 </style>
 </head>
@@ -484,13 +508,14 @@ function renderHome(){
   const ms=[...DB.matches].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.created-a.created);
   const live=ms.filter(m=>!m.done),done=ms.filter(m=>m.done);
   $('home').innerHTML=`
-  <div class="hgrid">
-    <button class="primary bigbtn" id="h-new">＋ Ny match</button>
+  ${installCard()}
+  <div class="hgrid${isAdmin()?'':' one'}">
+    ${isAdmin()?'<button class="primary bigbtn" id="h-new">＋ Ny match</button>':''}
     <button class="hbtn bigbtn" id="h-players">📈 Spelarstatistik</button>
   </div>
   ${(()=>{const fx=(DB.fixtures||[]).filter(f=>!DB.matches.some(m=>m.fixtureId===f.id));
-    return fx.length?`<div class="card"><h3>Kommande matcher · Dam 1 norra</h3>${fx.map(f=>item(`data-fx="${f.id}"`,(f.home?'🏠 ':'🚌 ')+esc(f.opp),`${fmtDate(f.date)} kl ${f.time} · ${esc(f.venue)} · omg ${f.round}`,'Starta ›')).join('')}</div>`:''})()}
-  ${live.length?`<div class="card"><h3>Pågående match</h3>${live.map(m=>item(`data-live="${m.id}"`,esc(m.team)+' – '+esc(m.opp),fmtDate(m.date),`<b class="sc">${scoreOf(m)}</b> Fortsätt ›`)).join('')}</div>`:''}
+    return fx.length?`<div class="card"><h3>Kommande matcher · Dam 1 norra</h3>${fx.map(f=>item(isAdmin()?`data-fx="${f.id}"`:'disabled',(f.home?'🏠 ':'🚌 ')+esc(f.opp),`${fmtDate(f.date)} kl ${f.time} · ${esc(f.venue)} · omg ${f.round}`,isAdmin()?'Starta ›':'')).join('')}</div>`:''})()}
+  ${live.length?`<div class="card"><h3>${isAdmin()?'Pågående match':'Pågår just nu'}</h3>${live.map(m=>item(`data-live="${m.id}"`,'<span class="livepill">LIVE</span> '+esc(m.team)+' – '+esc(m.opp),fmtDate(m.date),`<b class="sc">${scoreOf(m)}</b> ${isAdmin()?'Fortsätt':'Följ'} ›`)).join('')}</div>`:''}
   <div class="card"><h3>Tidigare matcher</h3>${done.length?done.map(m=>{
       const u=goalsOf(m,'us'),t=goalsOf(m,'them'),r=u>t?'win':u<t?'loss':'draw';
       return item(`data-m="${m.id}"`,(m.home===false?'🚌 ':m.home?'🏠 ':'')+esc(m.opp),fmtDate(m.date)+(m.round?' · omg '+m.round:'')+(m.result&&!m.events.length?' · endast resultat':' · '+esc(m.team)),`<b class="sc ${r}">${u}–${t}</b> ›`)}).join(''):'<p class="empty">Inga avslutade matcher än.</p>'}</div>
@@ -502,32 +527,33 @@ function renderHome(){
     ${ownTeams().map(t=>item(`data-t="${t.id}"`,esc(t.name),t.players.length+' spelare')).join('')||'<p class="empty">Inga egna lag.</p>'}
     <div class="sub">Motståndare</div>
     ${oppTeams().map(t=>item(`data-t="${t.id}"`,esc(t.name),t.players.length?t.players.length+' spelare':'ingen trupp')).join('')||'<p class="empty">Sparas automatiskt när du startar en match.</p>'}
-    <div class="row"><button class="hbtn" id="h-addteam">＋ Nytt lag</button></div>
+    ${isAdmin()?'<div class="row"><button class="hbtn" id="h-addteam">＋ Nytt lag</button></div>':''}
   </div>
   ${cloudCard()}
   <div class="card"><h3>Säkerhetskopia och dela data</h3>
     <p class="note" style="margin-top:0">Allt sparas bara på den här enheten. Exportera efter varje match så har du en backup. Filen kan också skickas till en annan tränare, som importerar den i sin app.</p>
-    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="h-exp">📤 Exportera allt</button><button class="hbtn" id="h-imp">📥 Importera fil</button></div>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="h-exp">📤 Exportera allt</button>${isAdmin()?'<button class="hbtn" id="h-imp">📥 Importera fil</button>':''}</div>
     <input type="file" id="h-file" accept=".json,application/json" style="display:none">
   </div>`;
   bindCloudCard();
   $('h-exp').onclick=()=>exportData(DB,'guif-statistik-'+today());
-  $('h-imp').onclick=()=>$('h-file').click();
+  if($('h-imp'))$('h-imp').onclick=()=>$('h-file').click();
   $('h-file').onchange=e=>{const f=e.target.files[0];if(f)importFile(f);e.target.value=''};
-  $('h-new').onclick=()=>{if(!ownTeams().length)openTeam(null,'own');else show('new')};
+  bindInstallCard();
+  if($('h-new'))$('h-new').onclick=()=>{if(!ownTeams().length)openTeam(null,'own');else show('new')};
   $('h-players').onclick=()=>show('players');
   $('home').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{pendingFx=(DB.fixtures||[]).find(f=>f.id===b.dataset.fx);show('new')});
-  $('h-addteam').onclick=()=>openTeam(null,'own');
-  $('home').querySelectorAll('[data-live]').forEach(b=>b.onclick=()=>{S=DB.matches.find(m=>m.id===b.dataset.live);show('match')});
+  if($('h-addteam'))$('h-addteam').onclick=()=>openTeam(null,'own');
+  $('home').querySelectorAll('[data-live]').forEach(b=>b.onclick=()=>{S=DB.matches.find(m=>m.id===b.dataset.live);if(isAdmin())show('match');else{resetMap();show('stats')}});
   $('home').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S=DB.matches.find(m=>m.id===b.dataset.m);resetMap();show('stats')});
-  $('home').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>openTeam(b.dataset.t));
+  if(isAdmin())$('home').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>openTeam(b.dataset.t));
 }
 
 /* =========================================================
    LAG
    ========================================================= */
 let editTeam=null,editType='own';
-function openTeam(id,type){editTeam=id?team(id):null;editType=editTeam?editTeam.type:(type||'own');show('team')}
+function openTeam(id,type){if(!isAdmin())return;editTeam=id?team(id):null;editType=editTeam?editTeam.type:(type||'own');show('team')}
 function renderTeam(){
   $('t-title').textContent=editTeam?editTeam.name:'Nytt lag';
   $('t-name').value=editTeam?editTeam.name:'';
@@ -735,12 +761,12 @@ function renderStats(){
     <div style="font-size:56px;font-weight:900;font-variant-numeric:tabular-nums"><span class="cus">${u}</span>–<span class="cthem">${t}</span></div>
     <p class="sub">${esc(S.team)} – ${esc(S.opp)}<br>${fmtDate(S.date)} kl ${esc(S.time||'')} · ${esc(S.venue||'')} · omgång ${S.round||'–'}</p>
     <p class="note">Resultatet är hämtat från Profixio. Ingen statistik registrerades i appen under den här matchen.</p></div>
-    <div class="card wide"><div class="row" style="margin:0"><button class="hbtn stop" id="st-del">🗑 Radera matchen</button></div></div>`;
-    $('st-del').onclick=()=>ask('Radera matchen mot '+S.opp+'?','Radera',()=>{DB.matches=DB.matches.filter(m=>m!==S);S=null;save();show('home')});
+    ${isAdmin()?'<div class="card wide"><div class="row" style="margin:0"><button class="hbtn stop" id="st-del">🗑 Radera matchen</button></div></div>':''}`;
+    if($('st-del'))$('st-del').onclick=()=>ask('Radera matchen mot '+S.opp+'?','Radera',()=>{DB.matches=DB.matches.filter(m=>m!==S);S=null;save();show('home')});
     return;
   }
-  $('st-title').textContent=S.team+' '+scoreOf(S)+' '+S.opp;
-  $('b-back-l').textContent=S.done?' Startskärmen':' Matchen';
+  $('st-title').innerHTML=(S.done?'':`<span class="livepill">LIVE</span> <span id="st-clock">${fmt(secs())}</span> · H${S.half} · `)+esc(S.team+' '+scoreOf(S)+' '+S.opp);
+  $('b-back-l').textContent=S.done||!isAdmin()?' Startskärmen':' Matchen';
   const rows=[['Mål',n('us','goal'),n('them','goal')],['Tekniska fel',n('us','tf'),n('them','tf')],['Räddningar',n('them','save'),n('us','saved')],['Skott utanför',n('us','miss'),n('them','miss')]];
   const h=hf=>n('us','goal',e=>e.half===hf)+'–'+n('them','goal',e=>e.half===hf);
   const ps=S.players.map(p=>{
@@ -761,7 +787,11 @@ function renderStats(){
     pts=ev('us','goal',e=>e.x!=null&&(!mapP||e.player===mapP)).map(e=>({x:e.x,y:e.y,c:'#ffd43b'}));
     pl_=[...new Set(ev('us','goal',e=>e.x!=null).map(e=>e.player).filter(Boolean))].map(id=>[id,plName(id)]).sort((a,b)=>(+(pl(a[0])||{}).num)-(+(pl(b[0])||{}).num));
   }
-  $('stats').innerHTML=`
+  const lastEv=S.events[S.events.length-1];
+  const hero=S.done?'':`<div class="card wide hero"><div class="ht"><span class="livepill">LIVE</span><span id="st-clock2">${fmt(secs())}</span><span>${S.half}:a halvlek</span>${S.clock.run?'':'<span>⏸ paus</span>'}</div>
+    <div class="tm"><div style="text-align:right">${esc(S.team)}</div><div class="hs"><span style="color:#ff8a8f">${n('us','goal')}</span>–<span style="color:#b9cbe0">${n('them','goal')}</span></div><div style="text-align:left">${esc(S.opp)}</div></div>
+    ${lastEv?`<div class="last">Senast: ${esc(describe(lastEv))}</div>`:''}</div>`;
+  $('stats').innerHTML=hero+`
   <div class="card"><h3>Snabböversikt ${S.done?'':'<span class="live">pågår</span>'}</h3><table class="big"><tr><th></th><th class="cus">${esc(S.team)}</th><th class="cthem">${esc(S.opp)}</th></tr>
   ${rows.map(r=>`<tr><td>${r[0]}</td><td class="cus">${r[1]}</td><td class="cthem">${r[2]}</td></tr>`).join('')}</table>
   <p class="sub">${fmtDate(S.date)} · Halvlek 1: ${h(1)} · Halvlek 2: ${h(2)}</p></div>
@@ -782,19 +812,20 @@ function renderStats(){
   ${goalSVG(pts,zonesOf(pts))}
   <div class="legend">${mapTeam==='them'?`<span><i class="dot" style="background:#eb5757"></i>Insläppt mål</span><span><i class="dot" style="background:#27ae60"></i>Vår räddning</span>`:'<span><i class="dot" style="background:#ffd43b"></i>Vårt mål</span>'}<span>${pts.length} st · siffror = antal per zon</span></div></div>
   <div class="card wide"><div class="row" style="margin:0;justify-content:space-between">
-    <button class="hbtn stop" id="st-del">🗑 Radera matchen</button>
+    ${isAdmin()?'<button class="hbtn stop" id="st-del">🗑 Radera matchen</button>':''}
     <button class="hbtn" id="st-exp">📤 Dela matchen</button>
-    ${S.done?'<button class="hbtn" id="st-reopen">✏️ Öppna matchläge för att rätta</button>':'<button class="hbtn go" id="st-match">Tillbaka till matchläge</button>'}
+    ${!isAdmin()?'':S.done?'<button class="hbtn" id="st-reopen">✏️ Öppna matchläge för att rätta</button>':'<button class="hbtn go" id="st-match">Tillbaka till matchläge</button>'}
   </div></div>`;
   $('stats').querySelectorAll('[data-team]').forEach(b=>b.onclick=()=>{mapTeam=b.dataset.team;mapP='';mapF='all';renderStats()});
   $('stats').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{mapF=b.dataset.f;renderStats()});
   $('stats').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{mapP=b.dataset.p;renderStats()});
-  $('st-del').onclick=()=>ask('Radera matchen mot '+S.opp+' ('+fmtDate(S.date)+')? Det går inte att ångra.','Radera',()=>{DB.matches=DB.matches.filter(m=>m!==S);S=null;save();show('home')});
+  if($('st-del'))$('st-del').onclick=()=>ask('Radera matchen mot '+S.opp+' ('+fmtDate(S.date)+')? Det går inte att ångra.','Radera',()=>{DB.matches=DB.matches.filter(m=>m!==S);S=null;save();show('home')});
   $('st-exp').onclick=()=>exportData({teams:DB.teams.filter(t=>t.id===S.teamId),matches:[S]},'guif-match-'+S.date+'-'+S.opp.replace(/[^a-zA-Z0-9åäöÅÄÖ]+/g,'-'));
   if($('st-reopen'))$('st-reopen').onclick=()=>{S.done=false;save();show('match')};
   if($('st-match'))$('st-match').onclick=()=>show('match');
 }
-$('b-back').onclick=()=>show(S&&!S.done?'match':'home');
+$('b-back').onclick=()=>show(S&&!S.done&&isAdmin()?'match':'home');
+setInterval(()=>{if(!S||S.done)return;['st-clock','st-clock2'].forEach(id=>{const c=$(id);if(c)c.textContent=fmt(secs())})},500);
 function summary(){
   const L=[`${S.team} – ${S.opp}  ${scoreOf(S)}  (${fmtDate(S.date)})`,'',
   `Tekniska fel: ${n('us','tf')} – ${n('them','tf')}`+(n('us','tf')?` (vi: ${tfText(ev('us','tf'))})`:''),`Räddningar: ${n('them','save')} – ${n('us','saved')}`,`Skott utanför: ${n('us','miss')} – ${n('them','miss')}`,'',
@@ -951,9 +982,10 @@ if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){
 const FB_CONFIG={apiKey:"AIzaSyA2vs1BGioRe8H-UpSaoV_3ODBHNhmULec",authDomain:"guif-stat.firebaseapp.com",projectId:"guif-stat",storageBucket:"guif-stat.firebasestorage.app",messagingSenderId:"149923454385",appId:"1:149923454385:web:73bd9b0cda277a1afdb190"};
 const FB_URL='https://www.gstatic.com/firebasejs/10.12.2/';
 const CK='guifstat-cloud';
-let CLOUD={space:null,used:false,last:{},ready:false};
-try{const c=JSON.parse(localStorage.getItem(CK));if(c)Object.assign(CLOUD,{space:c.space||null,used:!!c.used,last:c.last||{}})}catch(e){}
-function saveCloudState(){try{localStorage.setItem(CK,JSON.stringify({space:CLOUD.space,used:CLOUD.used,last:CLOUD.last}))}catch(e){}}
+let CLOUD={space:null,used:false,last:{},ready:false,role:null,adminCode:null};
+try{const c=JSON.parse(localStorage.getItem(CK));if(c)Object.assign(CLOUD,{space:c.space||null,used:!!c.used,last:c.last||{},role:c.role||null,adminCode:c.adminCode||null})}catch(e){}
+function isAdmin(){return !CLOUD.space||CLOUD.role!=='viewer'}
+function saveCloudState(){try{localStorage.setItem(CK,JSON.stringify({space:CLOUD.space,used:CLOUD.used,last:CLOUD.last,role:CLOUD.role,adminCode:CLOUD.adminCode}))}catch(e){}}
 let F=null,fbState='idle',authKnown=false,user=null,unsubs=[],cloudErr='',fbLoading=null,syncTimer=null,pendingRender=false,orphans={};
 
 function stable(v){
@@ -996,7 +1028,7 @@ function loadFirebase(){
 /* ---- skriv lokala ändringar till molnet ---- */
 function scheduleSync(){if(!CLOUD.space||!user||!F)return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,150)}
 function syncNow(){
-  if(!CLOUD.space||!user||!F||!CLOUD.ready)return;
+  if(!CLOUD.space||!user||!F||!CLOUD.ready||CLOUD.role==='viewer')return;
   const Fs=F.Fs,want={};
   DB.teams.forEach(t=>want['teams/'+t.id]=clean(t));
   DB.matches.forEach(m=>{want['matches/'+m.id]=matchMeta(m);m.events.forEach(e=>want['events/'+e.id]=eventDoc(e,m))});
@@ -1070,7 +1102,7 @@ function rerenderView(){
   updateDot();
   if(curView==='team'||curView==='new')return;
   if((curView==='match'||curView==='stats')&&!S){show('home');return}
-  if(curView==='match'&&S.done){resetMap();show('stats');return}
+  if(curView==='match'&&(S.done||!isAdmin())){resetMap();show('stats');return}
   R[curView]();
 }
 function refreshCloudUI(){updateDot();if(curView==='home'&&!$('ov').classList.contains('on'))renderHome()}
@@ -1086,87 +1118,184 @@ window.addEventListener('offline',()=>{updateDot();if(curView==='home')refreshCl
 
 /* ---- anslutning med lagkod (anonym inloggning i bakgrunden) ---- */
 async function ensureUser(){await loadFirebase();if(!F.auth.currentUser)await F.U.signInAnonymously(F.auth);user=F.auth.currentUser;return user}
-async function connectSpace(){
-  /* se till att enheten är medlem (t.ex. efter att appen installerats om) och starta synken */
-  try{
-    const Fs=F.Fs,ref=Fs.doc(F.db,'spaces',CLOUD.space),snap=await Fs.getDoc(ref);
-    if(snap.exists()&&!(snap.data().members||[]).includes(user.uid))await Fs.updateDoc(ref,{members:Fs.arrayUnion(user.uid)});
-  }catch(e){/* offline: kör på det som finns sparat */}
-  startSync();refreshCloudUI();
+const CODE_A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randCode(n){const r=new Uint32Array(n);crypto.getRandomValues(r);let c='';r.forEach(x=>c+=CODE_A[x%CODE_A.length]);return c}
+const shareUrl=code=>'https://dickfors.github.io/guif-stat/#lag-'+code;
+async function loadRole(){
+  /* admin = har ett adminJoins-dokument. Ägaren av ett äldre lagutrymme får admin-kod automatiskt. */
+  const Fs=F.Fs,sp=CLOUD.space,uid=user.uid;
+  const spSnap=await Fs.getDoc(Fs.doc(F.db,'spaces',sp));
+  if(!spSnap.exists())return;
+  const data=spSnap.data();
+  if(!(data.members||[]).includes(uid))await Fs.updateDoc(Fs.doc(F.db,'spaces',sp),{members:Fs.arrayUnion(uid)});
+  let adm=(await Fs.getDoc(Fs.doc(F.db,'spaces',sp,'adminJoins',uid))).exists();
+  if(!adm&&data.owner===uid){
+    const sec=randCode(6);
+    await Fs.setDoc(Fs.doc(F.db,'spaces',sp,'adminCodes',sec),{created:Date.now()});
+    await Fs.setDoc(Fs.doc(F.db,'spaces',sp,'adminJoins',uid),{code:sec,at:Date.now()});
+    adm=true;CLOUD.adminCode=sp+'-'+sec;
+  }
+  CLOUD.role=adm?'admin':'viewer';
+  if(adm&&!CLOUD.adminCode){try{const q=await Fs.getDocs(Fs.collection(F.db,'spaces',sp,'adminCodes'));if(q.docs[0])CLOUD.adminCode=sp+'-'+q.docs[0].id}catch(e){}}
+  saveCloudState();
 }
+async function connectSpace(){
+  try{await loadRole()}catch(e){/* offline: använd sparad roll */}
+  startSync();refreshCloudUI();if(curView!=='home')rerenderView();
+}
+
+/* ---- installationsruta ---- */
+let installEvt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(curView==='home'&&!$('ov').classList.contains('on'))renderHome()});
+const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function installHtml(){
+  if(isIOS()&&/CriOS|FxiOS|EdgiOS|GSA/.test(navigator.userAgent))return `<p class="note" style="margin-top:0">Öppna den här sidan i <b>Safari</b> för att kunna lägga appen på hemskärmen. Kopiera adressen och klistra in den i Safari.</p>`;
+  if(isIOS())return `<ol><li>Tryck på <b>dela-knappen</b> <span style="font-size:18px">⎋</span> (rutan med pil uppåt). På iPhone kan den ligga under <b>⋯</b>.</li><li>Välj <b>Lägg till på hemskärmen</b>.</li><li>Tryck <b>Lägg till</b> och öppna appen från hemskärmen.</li></ol>`;
+  if(installEvt)return `<p class="note" style="margin-top:0">Installera appen så hamnar den på hemskärmen och fungerar utan internet.</p><div class="row" style="justify-content:flex-start"><button class="hbtn go" id="i-inst">📲 Installera appen</button></div>`;
+  return `<p class="note" style="margin-top:0">Öppna webbläsarens meny (⋮) och välj <b>Installera app</b> eller <b>Lägg till på startskärmen</b>.</p>`;
+}
+function installCard(){
+  if(isStandalone())return '';
+  return `<div class="card install"><h3>📲 Lägg appen på hemskärmen</h3>${installHtml()}<p class="note">Öppna sedan alltid appen från ikonen på hemskärmen.</p></div>`;
+}
+function bindInstallCard(){if($('i-inst'))$('i-inst').onclick=async()=>{try{installEvt.prompt();await installEvt.userChoice}catch(e){}installEvt=null;renderHome()}}
 
 /* ---- kortet på startskärmen ---- */
 function cloudCard(){
-  const st=!navigator.onLine?'<span class="pill off">Offline – sparas på servern när nätet är tillbaka</span>':'<span class="pill ok">Sparas på servern</span>';
+  const st=!navigator.onLine?'<span class="pill off">Offline – synkar när nätet är tillbaka</span>':'<span class="pill ok">Sparas på servern · live</span>';
   let body;
-  if(CLOUD.space&&(fbState!=='error')&&(!authKnown||!user))body=`<p class="note" style="margin-top:0">Ansluter till servern…</p>`;
-  else if(!CLOUD.space)body=`<p class="note" style="margin-top:0">Just nu sparas allt bara på den här enheten. Koppla appen till lagets utrymme på servern, så sparas allt där och syns på alla enheter. Det fungerar även utan internet i hallen och synkas när nätet kommer tillbaka.</p>
-    <div class="row" style="justify-content:flex-start">
-      <button class="hbtn go" id="c-join">Gå med med lagkod</button>
-      <button class="hbtn" id="c-start">Starta nytt lagutrymme</button></div>`;
-  else body=`<p style="margin:0 0 10px">${st}</p>
-    <p class="note" style="margin-top:0">Lagkod: <b class="code">${esc(CLOUD.space)}</b><br>Skriv in koden på andra enheter och hos andra tränare så ser ni samma data.</p>
-    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="c-share">Dela lagkoden</button><button class="hbtn" id="c-leave">Koppla från</button></div>`;
+  if(CLOUD.space&&fbState!=='error'&&(!authKnown||!user))body=`<p class="note" style="margin-top:0">Ansluter till servern…</p>`;
+  else if(!CLOUD.space)body=`<p class="note" style="margin-top:0">Just nu sparas allt bara på den här enheten. Gå med i ett lag med en kod eller starta ett nytt lag, så sparas allt på servern och syns live på alla enheter.</p>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn go" id="c-join">Jag har en lagkod</button><button class="hbtn" id="c-start">Starta nytt lagutrymme</button></div>`;
+  else if(CLOUD.role==='admin')body=`<p style="margin:0 0 10px">${st}<span class="role admin">Admin</span></p>
+    <div class="codebox"><div class="sub" style="margin:0 0 4px">Kod för spelare och åskådare (kan bara titta)</div><b class="code">${esc(CLOUD.space)}</b>
+      <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="hbtn" id="c-share-v">Dela länk till laget</button></div></div>
+    <div class="codebox"><div class="sub" style="margin:0 0 4px">Admin-kod (kan ändra allt) – bara till tränare</div><b class="code">${esc(CLOUD.adminCode||'hämtas…')}</b>
+      <div class="row" style="justify-content:flex-start;margin-top:8px"><button class="hbtn" id="c-share-a">Dela admin-kod</button></div></div>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="c-leave">Koppla från</button></div>`;
+  else body=`<p style="margin:0 0 10px">${st}<span class="role viewer">Åskådare</span></p>
+    <p class="note" style="margin-top:0">Du kan följa matcher live och se all statistik. Bara tränare med admin-kod kan ändra.</p>
+    <div class="row" style="justify-content:flex-start"><button class="hbtn" id="c-admin">Jag har en admin-kod</button><button class="hbtn" id="c-leave">Koppla från</button></div>`;
   return `<div class="card"><h3>☁️ Spara på servern</h3>${body}${cloudErr?`<p class="err">${esc(cloudErr)}</p>`:''}</div>`;
+}
+async function shareText(t,btn){
+  try{if(navigator.share){await navigator.share({text:t});return}}catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(t);if(btn)btn.textContent='✓ Kopierat'}catch(e){open(`<h3>Kopiera och skicka</h3><textarea readonly style="min-height:120px">${esc(t)}</textarea><div class="row"><button class="hbtn" id="x-c">Stäng</button></div>`);$('x-c').onclick=close}
 }
 function bindCloudCard(){
   if($('c-start'))$('c-start').onclick=startSpace;
-  if($('c-join'))$('c-join').onclick=joinPrompt;
-  if($('c-leave'))$('c-leave').onclick=()=>ask('Koppla från lagutrymmet? Det som finns på enheten ligger kvar men slutar sparas på servern. Det som redan finns på servern påverkas inte.','Koppla från',()=>{stopSync();CLOUD.space=null;CLOUD.last={};saveCloudState();renderHome()});
-  if($('c-share'))$('c-share').onclick=async()=>{
-    const t=`Guif Matchstatistik: öppna https://dickfors.github.io/guif-stat/ i Safari, lägg till på hemskärmen och skriv lagkoden ${CLOUD.space} under "Spara på servern".`;
-    try{if(navigator.share){await navigator.share({text:t});return}}catch(e){if(e&&e.name==='AbortError')return}
-    try{await navigator.clipboard.writeText(t);$('c-share').textContent='✓ Kopierat'}catch(e){open(`<h3>Lagkod</h3><p style="font-size:30px;font-weight:800;letter-spacing:3px">${esc(CLOUD.space)}</p><div class="row"><button class="hbtn" id="x-c">Stäng</button></div>`);$('x-c').onclick=close}
-  };
+  if($('c-join'))$('c-join').onclick=()=>joinPrompt();
+  if($('c-admin'))$('c-admin').onclick=()=>joinPrompt(CLOUD.space+'-');
+  if($('c-leave'))$('c-leave').onclick=()=>ask('Koppla från lagutrymmet? Det som finns på enheten ligger kvar men slutar synkas. Det som finns på servern påverkas inte.','Koppla från',()=>{stopSync();CLOUD.space=null;CLOUD.last={};CLOUD.role=null;CLOUD.adminCode=null;saveCloudState();renderHome()});
+  if($('c-share-v'))$('c-share-v').onclick=e=>shareText(`Följ ${(ownTeams()[0]||{}).name||'laget'} live i Guif Matchstatistik!\n1. Öppna ${shareUrl(CLOUD.space)} i Safari\n2. Lägg till på hemskärmen\n3. Öppna appen och ange lagkoden ${CLOUD.space}`,e.target);
+  if($('c-share-a'))$('c-share-a').onclick=e=>shareText(`Admin-kod till Guif Matchstatistik (kan ändra matcher och lag – dela inte vidare): ${CLOUD.adminCode}\nAppen: https://dickfors.github.io/guif-stat/`,e.target);
 }
-function msgSheet(title,text,then){open(`<h3>${esc(title)}</h3><p>${esc(text)}</p><div class="row"><button class="hbtn" id="x-c">OK</button></div>`);$('x-c').onclick=then||close}
+function msgSheet(title,text,then){open(`<h3>${esc(title)}</h3><p>${esc(text)}</p><div class="row"><button class="hbtn go" id="x-c">OK</button></div>`);$('x-c').onclick=then||close}
+async function createSpace(){
+  await ensureUser();
+  const Fs=F.Fs,code=randCode(8),sec=randCode(6);
+  await Fs.setDoc(Fs.doc(F.db,'spaces',code),{name:(ownTeams()[0]||{}).name||'Lag',owner:user.uid,members:[user.uid],created:Date.now()});
+  await Fs.setDoc(Fs.doc(F.db,'spaces',code,'adminCodes',sec),{created:Date.now()});
+  await Fs.setDoc(Fs.doc(F.db,'spaces',code,'adminJoins',user.uid),{code:sec,at:Date.now()});
+  CLOUD.space=code;CLOUD.role='admin';CLOUD.adminCode=code+'-'+sec;CLOUD.last={};saveCloudState();startSync();
+  return code;
+}
 function startSpace(){
   CLOUD.used=true;saveCloudState();
   open(`<h3>Starta nytt lagutrymme</h3>
-  <p>Allt som finns på den här enheten laddas upp till servern: lag, trupp, matcher och statistik. Du får en lagkod som du sedan skriver in på övriga enheter.</p>
-  <p class="note">Gör det här på den enhet där ni har registrerat matcher. Har någon redan startat ett lagutrymme ska du välja <b>Gå med med lagkod</b> i stället.</p>
+  <p>Allt som finns på den här enheten laddas upp till servern: lag, trupp, matcher och statistik. Du blir admin och får två koder: en för åskådare och en admin-kod för tränare.</p>
+  <p class="note">Gör det här på den enhet där ni har registrerat matcher. Har någon redan startat ett lagutrymme ska du välja <b>Jag har en lagkod</b> i stället.</p>
   <p class="err" id="s-msg"></p>
   <div class="row"><button class="hbtn" id="s-x">Avbryt</button><button class="hbtn go" id="s-go">Starta och ladda upp</button></div>`);
   $('s-x').onclick=close;
   $('s-go').onclick=async()=>{
     $('s-msg').textContent='Ansluter…';$('s-go').disabled=true;
-    try{
-      await ensureUser();
-      const Fs=F.Fs,A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code='';
-      const r=new Uint32Array(8);crypto.getRandomValues(r);r.forEach(x=>code+=A[x%A.length]);
-      await Fs.setDoc(Fs.doc(F.db,'spaces',code),{name:(ownTeams()[0]||{}).name||'Lag',owner:user.uid,members:[user.uid],created:Date.now()});
-      CLOUD.space=code;CLOUD.last={};saveCloudState();startSync();
-      msgSheet('Klart!','Allt laddas nu upp till servern. Lagkoden är '+code+'. Skriv in den på övriga enheter under "Spara på servern" → "Gå med med lagkod".',()=>{close();renderHome()});
-    }catch(e){$('s-msg').textContent=errText(e);$('s-go').disabled=false}
+    try{await createSpace();doneOnb();msgSheet('Klart!','Allt laddas upp till servern. Du hittar koderna under "Spara på servern" på startskärmen.',()=>{close();renderHome()})}
+    catch(e){$('s-msg').textContent=errText(e);$('s-go').disabled=false}
   };
 }
-function joinPrompt(){
+function parseCode(v){
+  const c=String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(c.length===8)return{space:c};
+  if(c.length===14)return{space:c.slice(0,8),sec:c.slice(8)};
+  return null;
+}
+function joinPrompt(prefill){
   CLOUD.used=true;saveCloudState();loadFirebase().catch(()=>{});
-  const hasOwn=DB.matches.some(m=>m.events.length);
-  open(`<h3>Gå med med lagkod</h3>
-  <label for="j-code">Lagkod</label><input id="j-code" autocapitalize="characters" autocomplete="off" placeholder="T.ex. K7QM2XPA" style="font-size:22px;letter-spacing:2px;text-transform:uppercase">
-  ${hasOwn?'<p class="err">Den här enheten har registrerade matcher. De ersätts av lagets data på servern. Har du inte laddat upp dem: avbryt och välj Starta nytt lagutrymme här i stället, eller exportera först.</p>':'<p class="note">Lagets data hämtas från servern till den här enheten.</p>'}
+  const upgrading=!!(CLOUD.space&&prefill);
+  const hasOwn=!CLOUD.space&&DB.matches.some(m=>m.events.length);
+  const fromLink=(location.hash.match(/^#lag-([A-Za-z0-9]{8})$/)||[])[1];
+  open(`<h3>${upgrading?'Ange admin-kod':'Gå med i ett lag'}</h3>
+  <label for="j-code">${upgrading?'Admin-kod':'Lagkod eller admin-kod'}</label>
+  <input id="j-code" autocapitalize="characters" autocomplete="off" placeholder="${upgrading?'XXXXXXXX-XXXXXX':'T.ex. K7QM2XPA'}" style="font-size:22px;letter-spacing:2px;text-transform:uppercase" value="${esc(prefill||fromLink||'')}">
+  <p class="note">${upgrading?'Admin-koden får du av den som startade lagutrymmet.':'Lagkoden (8 tecken) ger rätt att titta. Admin-koden (längre, med bindestreck) ger rätt att ändra.'}</p>
+  ${hasOwn?'<p class="err">Den här enheten har egna registrerade matcher. De ersätts av lagets data på servern. Har du inte laddat upp dem: avbryt, exportera först eller välj Starta nytt lagutrymme.</p>':''}
   <p class="err" id="j-msg"></p>
-  <div class="row"><button class="hbtn" id="j-x">Avbryt</button><button class="hbtn go" id="j-go">Gå med</button></div>`);
+  <div class="row"><button class="hbtn" id="j-x">Avbryt</button><button class="hbtn go" id="j-go">${upgrading?'Bli admin':'Gå med'}</button></div>`);
   $('j-x').onclick=close;
   $('j-go').onclick=async()=>{
-    const code=$('j-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
-    if(code.length<6){$('j-msg').textContent='Skriv lagkoden.';return}
+    const p=parseCode($('j-code').value);
+    if(!p){$('j-msg').textContent='Koden ser inte rätt ut. Lagkoden har 8 tecken, admin-koden 8+6.';return}
+    if(upgrading&&(!p.sec||p.space!==CLOUD.space)){$('j-msg').textContent='Det där är ingen admin-kod för det här laget.';return}
     $('j-msg').textContent='Ansluter…';$('j-go').disabled=true;
     try{
       await ensureUser();
-      const Fs=F.Fs,ref=Fs.doc(F.db,'spaces',code),snap=await Fs.getDoc(ref);
-      if(!snap.exists()){$('j-msg').textContent='Hittar ingen lagkod '+code+'. Kontrollera koden.';$('j-go').disabled=false;return}
+      const Fs=F.Fs,ref=Fs.doc(F.db,'spaces',p.space),snap=await Fs.getDoc(ref);
+      if(!snap.exists()){$('j-msg').textContent='Hittar inget lag med koden '+p.space+'.';$('j-go').disabled=false;return}
       if(!(snap.data().members||[]).includes(user.uid))await Fs.updateDoc(ref,{members:Fs.arrayUnion(user.uid)});
+      let role='viewer';
+      if(p.sec){
+        try{await Fs.setDoc(Fs.doc(F.db,'spaces',p.space,'adminJoins',user.uid),{code:p.sec,at:Date.now()});role='admin'}
+        catch(e){$('j-msg').textContent='Fel admin-kod. Kontrollera koden.';$('j-go').disabled=false;return}
+      }else if((await Fs.getDoc(Fs.doc(F.db,'spaces',p.space,'adminJoins',user.uid))).exists())role='admin';
+      if(upgrading){CLOUD.role='admin';CLOUD.adminCode=p.space+'-'+p.sec;saveCloudState();close();startSync();renderHome();msgSheet('Du är nu admin','Du kan skapa och ändra matcher, lag och spelare.');return}
       DB={teams:[],matches:[],fixtures:[],table:null,seed:DB.seed};S=null;orphans={};
-      CLOUD.space=code;CLOUD.last={};saveLocal();saveCloudState();close();startSync();show('home');
+      CLOUD.space=p.space;CLOUD.role=role;CLOUD.adminCode=role==='admin'?p.space+'-'+p.sec:null;CLOUD.last={};
+      saveLocal();saveCloudState();doneOnb();close();startSync();show('home');
+      if(location.hash)history.replaceState(null,'',location.pathname);
     }catch(e){$('j-msg').textContent=errText(e);$('j-go').disabled=false}
   };
 }
+
+/* ---- första starten ---- */
+const ONB='guifstat-onb';
+function doneOnb(){try{localStorage.setItem(ONB,'1')}catch(e){}}
+function onboarding(){
+  open(`<div class="onb"><h2>Välkommen! 🤾</h2>
+  <p class="note" style="margin-top:0">Matchstatistik för handboll, live på iPad och telefon.</p>
+  ${isStandalone()?'':`<div class="card install" style="margin:12px 0"><h3>📲 Lägg appen på hemskärmen först</h3>${installHtml()}</div>`}
+  <button class="choice main" id="o-join"><b>Jag har en lagkod</b><span>Följ lagets matcher live, eller ange admin-kod om du är tränare.</span></button>
+  <button class="choice" id="o-new"><b>Skapa ett nytt lag</b><span>Du blir admin och lägger in lag, spelare och matcher.</span></button>
+  <button class="choice" id="o-try"><b>Bara prova</b><span>Allt sparas bara på den här enheten. Du kan koppla till servern senare.</span></button></div>`);
+  bindInstallCard();
+  $('o-join').onclick=()=>joinPrompt();
+  $('o-new').onclick=newTeamPrompt;
+  $('o-try').onclick=()=>{doneOnb();close();renderHome()};
+}
+function newTeamPrompt(){
+  open(`<h3>Skapa ett nytt lag</h3>
+  <label for="nt-name">Lagets namn</label><input id="nt-name" placeholder="T.ex. Eskilstuna Guif F14">
+  <p class="note">Laget skapas på servern och du blir admin. Sedan lägger du in spelarna.</p>
+  <p class="err" id="nt-msg"></p>
+  <div class="row"><button class="hbtn" id="nt-x">Tillbaka</button><button class="hbtn go" id="nt-go">Skapa lag</button></div>`);
+  $('nt-x').onclick=onboarding;
+  $('nt-go').onclick=async()=>{
+    const name=$('nt-name').value.trim();if(!name){$('nt-msg').textContent='Skriv lagets namn.';return}
+    $('nt-msg').textContent='Skapar…';$('nt-go').disabled=true;
+    const old=DB;
+    try{
+      DB={teams:[{id:'own-'+randCode(6).toLowerCase(),name,type:'own',players:[]}],matches:[],fixtures:[],table:null,seed:99};S=null;
+      await createSpace();saveLocal();doneOnb();close();openTeam(DB.teams[0].id);
+    }catch(e){DB=old;$('nt-msg').textContent=errText(e);$('nt-go').disabled=false}
+  };
+}
+
 if(CLOUD.space||CLOUD.used)loadFirebase().catch(()=>{});
 
 save();
 show('home');
+try{if(!CLOUD.space&&!localStorage.getItem(ONB))setTimeout(onboarding,300)}catch(e){}
 </script>
 </body>
 </html>

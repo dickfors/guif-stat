@@ -2,24 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function isMember(space) {
-      return signedIn() &&
-        request.auth.uid in get(/databases/$(database)/documents/spaces/$(space)).data.members;
+    function spaceDoc(space) { return get(/databases/$(database)/documents/spaces/$(space)); }
+    function isMember(space) { return signedIn() && request.auth.uid in spaceDoc(space).data.members; }
+    function isAdmin(space) {
+      return signedIn() && exists(/databases/$(database)/documents/spaces/$(space)/adminJoins/$(request.auth.uid));
     }
     match /spaces/{space} {
-      // Den som har lagkoden kan läsa lagutrymmet och lägga till sig själv som medlem
+      // Den som har lagkoden kan läsa lagutrymmet och lägga till sig själv som åskådare
       allow get: if signedIn();
       allow create: if signedIn()
         && request.resource.data.owner == request.auth.uid
         && request.resource.data.members == [request.auth.uid];
-      allow update: if isMember(space) || (signedIn()
+      allow update: if isAdmin(space) || (signedIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
         && request.resource.data.members.hasAll(resource.data.members)
         && request.resource.data.members.removeAll(resource.data.members).hasOnly([request.auth.uid]));
       allow delete: if signedIn() && resource.data.owner == request.auth.uid;
-      // Lag, matcher och händelser: bara medlemmar
+
+      // Admin-koder: bara admins kan se dem, bara ägaren kan skapa dem
+      match /adminCodes/{code} {
+        allow read: if isAdmin(space);
+        allow create: if signedIn() && spaceDoc(space).data.owner == request.auth.uid;
+      }
+      // Bli admin: kräver en giltig admin-kod
+      match /adminJoins/{uid} {
+        allow get: if signedIn() && (request.auth.uid == uid || isAdmin(space));
+        allow create: if signedIn() && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/spaces/$(space)/adminCodes/$(request.resource.data.code));
+        allow delete: if isAdmin(space);
+      }
+      // Lag, matcher och händelser: alla medlemmar läser, bara admins skriver
       match /{coll}/{docId} {
-        allow read, write: if isMember(space);
+        allow read: if coll in ['teams', 'matches', 'events', 'meta'] && isMember(space);
+        allow write: if coll in ['teams', 'matches', 'events', 'meta'] && isAdmin(space);
       }
     }
   }

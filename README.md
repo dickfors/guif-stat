@@ -17,10 +17,11 @@ Allt som registreras sparas bara på den egna enheten. Använd **Exportera** på
 ## Uppdatera appen
 När `index.html` ändras: höj versionen i `sw.js` (`guif-stat-v1` → `guif-stat-v2`) så att telefonerna hämtar den nya versionen.
 
-## Spara på servern
-Allt sparas på servern (Firebase) och synkas mellan alla enheter som har samma lagkod, även live under match. Ingen inloggning behövs. Appen fungerar utan internet och synkar när nätet är tillbaka.
+## Spara på servern, roller och live
+Allt sparas på servern (Firebase) och synkas live mellan alla enheter i samma lagutrymme. Ingen inloggning behövs.
 
-- Första enheten: **Spara på servern** → **Starta nytt lagutrymme** (laddar upp enhetens data) → dela lagkoden.
-- Övriga: **Spara på servern** → **Gå med med lagkod**.
-- Kräver att *Anonymous* är påslaget under Authentication → Sign-in method i Firebase.
-- Säkerhetsreglerna finns i `firestore.rules`.
+- **Lagkod (8 tecken):** spelare och åskådare – kan följa matcher live och se statistik, men inte ändra.
+- **Admin-kod (8+6 tecken):** tränare – kan skapa och ändra matcher, lag och spelare.
+- Första starten visar en välkomstskärm: *Jag har en lagkod*, *Skapa ett nytt lag* eller *Bara prova*.
+- Länken `https://dickfors.github.io/guif-stat/#lag-KOD` fyller i lagkoden automatiskt.
+- Kräver att *Anonymous* är påslaget i Firebase Authentication. Säkerhetsreglerna finns i `firestore.rules`.
