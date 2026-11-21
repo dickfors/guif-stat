@@ -522,13 +522,13 @@ function renderHome(){
   ${DB.table?`<div class="card"><h3>Tabell ${esc(DB.table.name)}</h3><table class="tbl"><tr><th>#</th><th>Lag</th><th>M</th><th>V</th><th>O</th><th>F</th><th>P</th></tr>
     ${DB.table.rows.map((r,i)=>`<tr class="${/guif/i.test(r[0])?'me':''}"><td>${i+1}</td><td>${esc(r[0])}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td><b>${r[5]}</b></td></tr>`).join('')}</table>
     <p class="note">Från Profixio ${fmtDate(DB.table.fetched)}. Uppdateras inte automatiskt. <a href="${esc(DB.table.url)}" style="color:var(--them)">Öppna i Profixio</a></p></div>`:''}
-  <div class="card"><h3>Lag</h3>
+  ${isAdmin()?`<div class="card"><h3>Lag</h3>
     <div class="sub" style="margin-top:0">Egna lag</div>
     ${ownTeams().map(t=>item(`data-t="${t.id}"`,esc(t.name),t.players.length+' spelare')).join('')||'<p class="empty">Inga egna lag.</p>'}
     <div class="sub">Motståndare</div>
     ${oppTeams().map(t=>item(`data-t="${t.id}"`,esc(t.name),t.players.length?t.players.length+' spelare':'ingen trupp')).join('')||'<p class="empty">Sparas automatiskt när du startar en match.</p>'}
-    ${isAdmin()?'<div class="row"><button class="hbtn" id="h-addteam">＋ Nytt lag</button></div>':''}
-  </div>
+    <div class="row"><button class="hbtn" id="h-addteam">＋ Nytt lag</button></div>
+  </div>`:''}
   ${cloudCard()}
   <div class="card"><h3>Säkerhetskopia och dela data</h3>
     <p class="note" style="margin-top:0">Allt sparas bara på den här enheten. Exportera efter varje match så har du en backup. Filen kan också skickas till en annan tränare, som importerar den i sin app.</p>
