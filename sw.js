@@ -1,6 +1,6 @@
 // Guif Matchstatistik – gör att appen fungerar utan internet.
 // Höj versionen när appen uppdateras så att telefonerna hämtar den nya.
-const CACHE='guif-stat-v4';
+const CACHE='guif-stat-v5';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 const FB='https://www.gstatic.com/firebasejs/10.12.2/';
 const FB_FILES=[FB+'firebase-app.js',FB+'firebase-auth.js',FB+'firebase-firestore.js'];
@@ -10,7 +10,7 @@ self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
   const u=new URL(e.request.url);
   // Bara appens egna filer och Firebase-biblioteken. Databastrafiken går direkt till Firebase.
-  if(u.origin!==location.origin&&!e.request.url.startsWith(FB))return;
+  if(u.origin!==location.origin&&!e.request.url.startsWith(FB)&&!/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname))return;
   e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(hit=>{
     const net=fetch(e.request).then(r=>{if(r.ok){const c=r.clone();caches.open(CACHE).then(x=>x.put(e.request,c))}return r}).catch(()=>hit||caches.match('./index.html'));
     return hit||net;
